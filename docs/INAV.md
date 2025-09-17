@@ -1,0 +1,2 @@
+# INav Docs
+## Configurator
