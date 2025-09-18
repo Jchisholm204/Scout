@@ -1,0 +1,3 @@
+[submodule "src/interfaces/inav_bridge/libmsp"]
+	path = src/interfaces/inav_bridge/libmsp
+	url = https://github.com/christianrauch/msp.git
