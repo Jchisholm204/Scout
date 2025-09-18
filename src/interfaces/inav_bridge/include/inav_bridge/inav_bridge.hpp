@@ -15,12 +15,16 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float32.hpp"
+#include "FlightController.hpp"
 
 class INAVBridge : public rclcpp::Node {
     public:
         INAVBridge();
     private:
-
+        fcu::FlightController _fc;
+        rclcpp::TimerBase::SharedPtr _timer;
+        void timer_callback(void);
+        void imu_callback(const msp::msg::RawImu& imu);
 };
 
 #endif

@@ -1,64 +1,70 @@
+# CMake File for INAV Bridge
+# Jacob Chisholm (https://Jchisholm204.github.io)
+# version 0.1
+# 2025-03-23
 set(NODE inav_bridge)
 
 # Ensure the required packages are avaliable
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(Threads)
 
-# Ensure executables go into the build folder
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/libmsp/cmake/")
+find_package(ASIO REQUIRED)
+add_definitions(-DASIO_STANDALONE)
+add_definitions(-DASIO_HAS_STD_ADDRESSOF)
+add_definitions(-DASIO_HAS_STD_ARRAY)
+add_definitions(-DASIO_HAS_CSTDINT)
+add_definitions(-DASIO_HAS_STD_SHARED_PTR)
+add_definitions(-DASIO_HAS_STD_TYPE_TRAITS)
 
-# Add the MSP submodule (examples/tests excluded)
-add_subdirectory(${NODE}/libmsp EXCLUDE_FROM_ALL)
-
-# Gather sources
-file(GLOB_RECURSE PROJECT_SOURCES
+# Gather all sources for this project
+file(GLOB_RECURSE PROJECT_SOURCES FOLLOW_SYMLINKS
     ${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/src/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/libmsp/src/*.cpp
 )
 
-# Add executable
-add_executable(${NODE} ${PROJECT_SOURCES})
+# Setup Library Dependencies
+set(${NODE}_DEPS rclcpp std_msgs sensor_msgs ASIO Threads)
 
+# Add to include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/libmsp/inc/msp
+)
 
-# Link MSP libraries
-target_link_libraries(${NODE} mspclient msp_fcu)
+# Add this node as an executable 
+add_executable(${NODE}
+    ${PROJECT_SOURCES}
+)
 
-# Include directories (use BUILD/INSTALL interface)
 target_include_directories(${NODE} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/libmsp/inc/msp>
     $<INSTALL_INTERFACE:include>
 )
 
-# Add these flags to your target
-target_compile_options(${NODE} PRIVATE
-    -fsanitize=address
-    -fsanitize=undefined
-)
-target_link_options(${NODE} PRIVATE
-    -fsanitize=address
-    -fsanitize=undefined
-)
+
+# Library dependencies
+ament_target_dependencies(${NODE} ${${NODE}_DEPS})
 
 
-# Link ROS 2 dependencies
-ament_target_dependencies(${NODE} rclcpp sensor_msgs std_msgs)
-
-# Install headers
+# Install header files
 install(
     DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include/
     DESTINATION include/${PROJECT_NAME}
 )
 
-# Install executable
+# Install library files
 install(
     TARGETS ${NODE}
     EXPORT export_${NODE}
     DESTINATION lib/${PROJECT_NAME}
 )
 
-# Export targets and includes (before final ament_package in parent)
-ament_export_include_directories($<INSTALL_INTERFACE:include>)
+# Exports
+ament_export_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include)
 ament_export_targets(export_${NODE} HAS_LIBRARY_TARGET)
-ament_export_dependencies(rclcpp sensor_msgs std_msgs)
+ament_export_dependencies(${${NODE}_DEPS})
+
 
