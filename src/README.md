@@ -5,8 +5,10 @@ See [this link](https://jchisholm204.github.io/posts/ros_project_templating/) fo
 ## Perception Package
 Handles all perception including video processing, sensor data, ...
 
-## LLI - Low Level Interfaces Package
-Handles the low level interfacing with the drone.
+## Interfaces
+The interfaces package handles all sensor/device interfacing.
+### `inav_bridge`
+The `inav_bridge` node handles interfacing ROS with INAV on the FC.
 
-## SLLI - Simulator Low Level Interfaces Package
-Simulation version of the low level interfacing (LLI) package.
+Deps:
+    - libmsp (included in the project directory as a git submodule)

@@ -1,5 +1,7 @@
 #!/bin/zsh
 
+# Built Script - For Building the ROS application
+
 # This Script runs using ZSH!
 # It can be changed to bash by modifying the top line
 
