@@ -1,18 +1,26 @@
-# CMake File for Duck Avoidance
+# CMake File for INAV Bridge
 # Jacob Chisholm (https://Jchisholm204.github.io)
 # version 0.1
 # 2025-03-23
-set(NODE duck_avoidance)
+set(NODE inav_bridge)
 
 # Ensure the required packages are avaliable
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
-find_package(OpenCV 4 REQUIRED)
-find_package(message_filters REQUIRED)
-find_package(geometry_msgs REQUIRED)
 
+# Add the MSP library
+# Disable pkg-config and install for libmsp
+# set(INSTALL_MSP_PKGCONFIG OFF CACHE BOOL "Disable pkg-config install" FORCE)
+# set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY TRUE)  # prevent install() in subdirs
+# Ensure executables go into the build folder, not the source folder
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# Add the submodule
+add_subdirectory(${NODE}/libmsp EXCLUDE_FROM_ALL)
+find_package(PkgConfig)
+# pkg_check_modules(msp REQUIRED msp)
+find_package(msp REQUIRED)
 
 
 # Gather all sources for this project
@@ -21,7 +29,7 @@ file(GLOB_RECURSE PROJECT_SOURCES FOLLOW_SYMLINKS
 )
 
 # Setup Library Dependencies
-set(${NODE}_DEPS rclcpp std_msgs sensor_msgs cv_bridge OpenCV message_filters geometry_msgs)
+set(${NODE}_DEPS rclcpp std_msgs sensor_msgs )
 
 # Add to include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include)
@@ -36,8 +44,17 @@ target_include_directories(${NODE} PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+
 # Library dependencies
 ament_target_dependencies(${NODE} ${${NODE}_DEPS})
+
+# target_link_libraries(${NODE}
+#     PRIVATE
+#         msp_fcu
+#         mspclient
+# )
+
+link_libraries(msp_fcu mspclient)
 
 # Install header files
 install(
@@ -56,4 +73,5 @@ install(
 ament_export_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include)
 ament_export_targets(export_${NODE} HAS_LIBRARY_TARGET)
 ament_export_dependencies(${${NODE}_DEPS})
+
 

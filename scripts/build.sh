@@ -5,7 +5,8 @@
 # This Script runs using ZSH!
 # It can be changed to bash by modifying the top line
 
-PKGS_COMMON=("vision" "joystick_controller")
+# PKGS_COMMON=("joystick_controller" "interfaces")
+PKGS_COMMON=("interfaces")
 PKGS_JETSON=()
 
 HOSTNAME_JETSON="jetson"
