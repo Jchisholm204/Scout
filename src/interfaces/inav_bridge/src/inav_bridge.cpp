@@ -20,6 +20,11 @@ INAVBridge::INAVBridge() : Node("inav_bridge") {
                             std::bind(&INAVBridge::timer_callback, this));
 
     _fc.subscribe<msp::msg::RawImu>(std::bind(&INAVBridge::imu_callback, this, std::placeholders::_1), 0.1);
+    fcu::FlightMode mode;
+    mode.primary = fcu::FlightMode::PRIMARY_MODE::ANGLE;
+    mode.secondary = fcu::FlightMode::SECONDARY_MODE::NAV_ALTHOLD;
+    mode.modifier = fcu::FlightMode::MODIFIER::ARM;
+    _fc.setFlightMode(mode);
 }
 
 void INAVBridge::timer_callback(void) {

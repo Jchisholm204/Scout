@@ -6,5 +6,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 include(inav_bridge/build.cmake)
+include(rplidar_bridge/build.cmake)
 
 ament_package()
