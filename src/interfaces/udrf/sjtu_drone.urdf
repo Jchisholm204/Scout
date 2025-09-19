@@ -20,15 +20,17 @@
       <origin rpy="0 0 0" xyz="0   0   0.04"/>
       <geometry>
           <!-- <mesh filename="file://$(find Scout)/udrf/sjtu_drone/quadrotor_4.stl"/> -->
-          <mesh filename="file:///home/jacob/Documents/Scout/udrf/sjtu_drone/quadrotor_4.stl"/>
-        <!-- <mesh filename="package://sjtu_drone/quadrotor_4.stl"/> -->
+          <!-- <mesh filename="file://$(find interfaces)/udrf/quadrotor_4.stl"/> -->
+          <!-- <mesh filename="quadrotor_4.stl"/> -->
+          <mesh filename="package://interfaces/udrf/quadrotor_4.stl"/>
       </geometry>
     </collision>
     <visual name="sjtu_drone_visual">
       <origin rpy="0 0 0" xyz="0   0   0.04"/>
       <geometry>
-        <mesh filename="file://$(find Scout)/udrf/quadrotor_4.dae"/>
-        <!-- <mesh filename="package://sjtu_drone/quadrotor_4.dae"/> -->
+        <!-- <mesh filename="quadrotor_4.dae"/> -->
+        <mesh filename="package://interfaces/udrf/quadrotor_4.dae"/>
+          <!-- <mesh filename="file://$(find interfaces)/udrf/quadrotor_4.dae"/> -->
       </geometry>
     </visual>
   </link>

@@ -34,16 +34,16 @@ INAVBridge::INAVBridge() : Node("inav_bridge") {
         this->create_wall_timer(std::chrono::milliseconds(50),
                             std::bind(&INAVBridge::tfbcast_callback, this));
     _tfbcast = std::make_shared<tf2_ros::TransformBroadcaster>(this);
-
+    
 }
 
 void INAVBridge::timer_callback(void) {
 }
 
 void INAVBridge::imu_callback(const msp::msg::RawImu& imu){
-    auto im = msp::msg::ImuSI(imu, 512.0, 1.0 / 4.096, 0.92f / 10.0f, 9.80665f);
-    RCLCPP_INFO(this->get_logger(), "ACC: %0.2f %0.2f %0.2f\n", im.acc[0](), im.acc[1](), im.acc[2]());
-    RCLCPP_INFO(this->get_logger(), "GYRO: %0.2f %0.2f %0.2f\n", im.gyro[0](), im.gyro[1](), im.gyro[2]());
+    _imu = std::make_shared<msp::msg::ImuSI>(imu, 512.0, 1.0 / 4.096, 0.92f / 10.0f, 9.80665f);
+    RCLCPP_INFO(this->get_logger(), "ACC: %0.2f %0.2f %0.2f\n", _imu->acc[0](), _imu->acc[1](), _imu->acc[2]());
+    RCLCPP_INFO(this->get_logger(), "GYRO: %0.2f %0.2f %0.2f\n", _imu->gyro[0](), _imu->gyro[1](), _imu->gyro[2]());
     std::cout << msp::msg::ImuSI(imu, 512.0, 1.0 / 4.096, 0.92f / 10.0f, 9.80665f);
 }
 
@@ -51,18 +51,43 @@ void INAVBridge::tfbcast_callback(void){
     geometry_msgs::msg::TransformStamped t;
     t.header.stamp = this->now();
     t.header.frame_id = "map";
-    t.child_frame_id = "sjtu_drone";
     t.child_frame_id = "base_footprint";
-    // Set drone position (example values, update from sensors or control)
-    t.transform.translation.x = 1.0;
-    t.transform.translation.y = 2.0;
-    t.transform.translation.z = 0.5;
 
-    // Set drone orientation (quaternion)
-    t.transform.rotation.x = 0.0;
-    t.transform.rotation.y = 0.0;
-    t.transform.rotation.z = 0.0;
-    t.transform.rotation.w = 1.0;
+    // Example position
+    t.transform.translation.x = 0.0;
+    t.transform.translation.y = 0.0;
+    t.transform.translation.z = 1;
+
+    // --- Compute orientation from accelerometer ---
+    float ax = _imu->acc[0]();
+    float ay = _imu->acc[1]();
+    float az = _imu->acc[2]();
+
+    // Normalize acceleration vector
+    float norm = std::sqrt(ax * ax + ay * ay + az * az);
+    if (norm > 1e-6f) {
+        ax /= norm;
+        ay /= norm;
+        az /= norm;
+    }
+
+    // Compute roll and pitch from gravity vector
+    float roll  = std::atan2(ay, az);                    // rotation around x-axis
+    float pitch = std::atan2(-ax, std::sqrt(ay*ay + az*az));  // rotation around y-axis
+
+    // Convert roll/pitch to quaternion (yaw = 0)
+    float cy = std::cos(0.0f * 0.5f);  // yaw = 0
+    float sy = std::sin(0.0f * 0.5f);
+    float cp = std::cos(pitch * 0.5f);
+    float sp = std::sin(pitch * 0.5f);
+    float cr = std::cos(roll * 0.5f);
+    float sr = std::sin(roll * 0.5f);
+
+    t.transform.rotation.w = cr * cp * cy + sr * sp * sy;
+    t.transform.rotation.x = sr * cp * cy - cr * sp * sy;
+    t.transform.rotation.y = cr * sp * cy + sr * cp * sy;
+    t.transform.rotation.z = cr * cp * sy - sr * sp * cy;
 
     _tfbcast->sendTransform(t);
 }
+

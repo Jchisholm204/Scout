@@ -63,6 +63,13 @@ install(
     DESTINATION lib/${PROJECT_NAME}
 )
 
+# Install UDRF
+install(
+    DIRECTORY udrf
+    DESTINATION share/${PROJECT_NAME}
+)
+
+
 # Exports
 ament_export_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/include)
 ament_export_targets(export_${NODE} HAS_LIBRARY_TARGET)

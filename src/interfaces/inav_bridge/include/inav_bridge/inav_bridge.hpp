@@ -32,6 +32,7 @@ class INAVBridge : public rclcpp::Node {
         std::shared_ptr<tf2_ros::TransformBroadcaster> _tfbcast;
         rclcpp::TimerBase::SharedPtr _timer_tfbcast;
         void tfbcast_callback(void);
+        std::shared_ptr<msp::msg::ImuSI> _imu;
 };
 
 #endif
