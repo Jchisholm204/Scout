@@ -8,6 +8,7 @@ set(NODE inav_bridge)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(Threads)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${NODE}/libmsp/cmake/")
@@ -26,7 +27,7 @@ file(GLOB_RECURSE PROJECT_SOURCES FOLLOW_SYMLINKS
 )
 
 # Setup Library Dependencies
-set(${NODE}_DEPS rclcpp std_msgs sensor_msgs ASIO Threads)
+set(${NODE}_DEPS rclcpp std_msgs sensor_msgs ASIO Threads tf2_ros)
 
 # Add to include directories
 include_directories(
