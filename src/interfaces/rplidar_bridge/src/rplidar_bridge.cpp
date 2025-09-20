@@ -111,7 +111,7 @@ void RPLIDARBridge::lidar_callback(void) {
         std::sort(nodes, nodes + nodeCount, [](const auto& a, const auto& b) {
             float angleA = a.angle_z_q14 * 90.0f / (1 << 14);
             float angleB = b.angle_z_q14 * 90.0f / (1 << 14);
-            return angleA < angleB;
+            return angleA > angleB;
         });
 
         msg.angle_min = FLT_MAX;
