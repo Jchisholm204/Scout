@@ -62,6 +62,37 @@ All topics are published with the naming convention `/prefix/topic`.
 - `rssi`: RSSI Signal Strength (0-100%)
 
 ### `rplidar_bridge`
+Handles interfacing between the RPLiDAR and ROS.
 
-### `rviz_bridge`
+#### Parameters
+- `lidar_path`:
+    - Desc: UNIX File path to the LiDAR file descriptor
+    - Type: `std::string`
+    - Default: `/dev/ttyUSB0`
+- `lidar_baud`:
+    - Desc: Baud rate to use with the LiDAR (Change with Caution)
+    - Type: `uint64_t`
+    - Default: `460800`
+- `pub_prefix`:
+    - Desc: Publish Prefix (lidar topic name)
+    - Type: `std::string`
+    - Default: `lidar`
+- `frame_id`:
+    - Desc: Base Frame ID for RVIZ
+    - Type: `std::string`
+    - Default: `map`
+- `pub_rate`:
+    - Desc: Lidar Message Publish rate (in ms)
+    - Type: `uint64_t`
+    - Default: `50`
+    - Max: `1000`
+    - Min: `10`
+- `lidar_mode`:
+    - Desc: Lidar Mode to be used
+    - Type: `uint64_t`
+    - Default: `0`
+    - Max: Depends on model of LiDAR
+    - Min: `0`
 
+#### Topics
+- `$(pub_prefix)`: Laser Scan message with LiDAR Data
