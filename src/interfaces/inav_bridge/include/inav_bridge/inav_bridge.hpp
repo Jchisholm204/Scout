@@ -28,6 +28,7 @@
 class INAVBridge : public rclcpp::Node {
   public:
     INAVBridge();
+    ~INAVBridge();
 
   private:
     fcu::FlightController _fc;

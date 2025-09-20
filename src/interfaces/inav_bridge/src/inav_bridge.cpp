@@ -17,7 +17,7 @@
 
 INAVBridge::INAVBridge() : Node("inav_bridge"), _fall_time(5, 0), _wd_maxtime(100, 0) {
     this->declare_parameter("fc_path", "/dev/ttyACM0");
-    this->declare_parameter("fc_baud", 115200);
+    this->declare_parameter("fc_baud", 921600);
     this->declare_parameter("wd_timeout", 500);
     this->declare_parameter("pub_prefix", "inav");
     this->declare_parameter("movement_topic", "movement");
@@ -64,15 +64,15 @@ INAVBridge::INAVBridge() : Node("inav_bridge"), _fall_time(5, 0), _wd_maxtime(10
     _fc.setLoggingLevel(msp::client::LoggingLevel::SILENT);
     _fc.connect(fc_path, fc_baud);
     _fc.subscribe<msp::msg::RawImu>(
-        std::bind(&INAVBridge::on_imu, this, std::placeholders::_1), 0.1);
+        std::bind(&INAVBridge::on_imu, this, std::placeholders::_1), 0.05);
     _fc.subscribe<msp::msg::Motor>(
         std::bind(&INAVBridge::on_motor, this, std::placeholders::_1), 0.1);
     _fc.subscribe<msp::msg::Attitude>(
-        std::bind(&INAVBridge::on_attitude, this, std::placeholders::_1), 0.1);
+        std::bind(&INAVBridge::on_attitude, this, std::placeholders::_1), 0.05);
     _fc.subscribe<msp::msg::Altitude>(
         std::bind(&INAVBridge::on_altitude, this, std::placeholders::_1), 0.1);
     _fc.subscribe<msp::msg::Analog>(
-        std::bind(&INAVBridge::on_analog, this, std::placeholders::_1), 0.1);
+        std::bind(&INAVBridge::on_analog, this, std::placeholders::_1), 0.05);
     _fc.subscribe<msp::msg::DebugMessage>(
         std::bind(&INAVBridge::on_debug_msg, this, std::placeholders::_1), 0.1);
 
@@ -101,11 +101,18 @@ INAVBridge::INAVBridge() : Node("inav_bridge"), _fall_time(5, 0), _wd_maxtime(10
 
     // Create ROS Subscriptions
     this->_movement_sub = this->create_subscription<geometry_msgs::msg::Quaternion>(
-        rtx_pre + move_name, 10,
+        rtx_pre + "/" + move_name, 10,
         std::bind(&INAVBridge::movement_callback, this, std::placeholders::_1));
     this->_arming_sub = this->create_subscription<std_msgs::msg::Bool>(
-        rtx_pre + move_name, 10,
+        rtx_pre + "/" + arm_name, 10,
         std::bind(&INAVBridge::arming_callback, this, std::placeholders::_1));
+}
+
+INAVBridge::~INAVBridge(){
+    std_msgs::msg::Bool arm;
+    arm.data = false;
+    arming_callback(arm);
+    _fc.disconnect();
 }
 
 void INAVBridge::wd_callback(void) {
@@ -194,8 +201,7 @@ void INAVBridge::arming_callback(const std_msgs::msg::Bool& arm) {
         if (arm.data) {
             _fc.setRc(1000, 1000, 1000, 1000, 2000);
             _wd_checkin = this->get_clock()->now();
-        }
-        else{
+        } else {
             _fc.setRc(1000, 1000, 1000, 1000, 0);
             _wd_checkin = this->get_clock()->now();
         }
