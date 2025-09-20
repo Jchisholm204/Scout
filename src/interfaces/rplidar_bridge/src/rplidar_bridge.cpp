@@ -107,6 +107,18 @@ void RPLIDARBridge::lidar_callback(void) {
     msg.header.stamp = this->now();
     msg.header.frame_id = _frame_id;
     if (SL_IS_OK(res)) {
+        // Sort nodes by angle (ascending)
+        std::sort(nodes, nodes + nodeCount, [](const auto& a, const auto& b) {
+            float angleA = a.angle_z_q14 * 90.0f / (1 << 14);
+            float angleB = b.angle_z_q14 * 90.0f / (1 << 14);
+            return angleA < angleB;
+        });
+
+        msg.angle_min = FLT_MAX;
+        msg.angle_max = 0;
+        msg.ranges.reserve(nodeCount);
+        msg.intensities.reserve(nodeCount);
+
         for (size_t i = 0; i < nodeCount; i++) {
             float angle = nodes[i].angle_z_q14 * 90.0f / (1 << 14);
             angle = angle * M_PI / 180;
@@ -114,14 +126,34 @@ void RPLIDARBridge::lidar_callback(void) {
                 msg.angle_min = angle;
             if (angle > msg.angle_max)
                 msg.angle_max = angle;
-            float distance =
-                ((float) nodes[i].dist_mm_q2) / 1000.0f / (float) (1 << 2);
+            float distance = ((float) nodes[i].dist_mm_q2) / 1000.0f / (float) (1 << 2);
             msg.ranges.push_back(distance);
             msg.intensities.push_back(nodes[i].quality);
         }
+
         msg.range_min = 0.1;
         msg.range_max = 6.0;
-        msg.angle_increment = (msg.angle_max - msg.angle_min) / msg.ranges.size();
+        msg.angle_increment = (msg.angle_max - msg.angle_min) / (msg.ranges.size() - 1);
+
         _ls_pub->publish(msg);
     }
+
+    // if (SL_IS_OK(res)) {
+    //     for (size_t i = 0; i < nodeCount; i++) {
+    //         float angle = nodes[i].angle_z_q14 * 90.0f / (1 << 14);
+    //         angle = angle * M_PI / 180;
+    //         if (angle < msg.angle_min)
+    //             msg.angle_min = angle;
+    //         if (angle > msg.angle_max)
+    //             msg.angle_max = angle;
+    //         float distance =
+    //             ((float) nodes[i].dist_mm_q2) / 1000.0f / (float) (1 << 2);
+    //         msg.ranges.push_back(distance);
+    //         msg.intensities.push_back(nodes[i].quality);
+    //     }
+    //     msg.range_min = 0.1;
+    //     msg.range_max = 6.0;
+    //     msg.angle_increment = (msg.angle_max - msg.angle_min) / msg.ranges.size();
+    //     _ls_pub->publish(msg);
+    // }
 }
