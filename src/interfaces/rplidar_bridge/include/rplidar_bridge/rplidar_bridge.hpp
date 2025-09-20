@@ -16,15 +16,20 @@
 #include "rplidar.h"
 #include "sl_lidar.h"
 #include "sl_lidar_driver.h"
+#include "sensor_msgs/msg/laser_scan.hpp"
 
 class RPLIDARBridge : public rclcpp::Node {
     public:
         RPLIDARBridge();
         ~RPLIDARBridge();
     private:
-        rclcpp::TimerBase::SharedPtr _timer;
         sl::ILidarDriver *_lidar;
-        void timer_callback(void);
+        sl_lidar_response_device_info_t _lidar_info;
+        std::string _frame_id;
+        rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_pub;
+        void _start(bool on = true, int mode = 0);
+        rclcpp::TimerBase::SharedPtr _lidar_timer;
+        void lidar_callback(void);
 };
 
 #endif
