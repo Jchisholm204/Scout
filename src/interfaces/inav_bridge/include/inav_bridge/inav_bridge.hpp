@@ -32,6 +32,7 @@ class INAVBridge : public rclcpp::Node {
 
   private:
     fcu::FlightController _fc;
+    bool _fc_armed;
     rclcpp::Duration _fall_time;
     int64_t _fall_speed;
     // Drone Communication Watchdog

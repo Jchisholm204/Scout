@@ -75,6 +75,7 @@ INAVBridge::INAVBridge() : Node("inav_bridge"), _fall_time(5, 0), _wd_maxtime(10
         std::bind(&INAVBridge::on_analog, this, std::placeholders::_1), 0.05);
     _fc.subscribe<msp::msg::DebugMessage>(
         std::bind(&INAVBridge::on_debug_msg, this, std::placeholders::_1), 0.1);
+    _fc_armed = false;
 
     // Setup FC Mode
     fcu::FlightMode mode;
@@ -191,18 +192,22 @@ void INAVBridge::on_debug_msg(const msp::msg::DebugMessage& dbg) {
     RCLCPP_INFO(this->get_logger(), "%s", dbg.debug_msg().c_str());
 }
 void INAVBridge::movement_callback(const geometry_msgs::msg::Quaternion& q) {
-    if (_fc.isArmed() && _fc.isConnected()) {
+    if (_fc.isArmed() && _fc.isConnected() && _fc_armed) {
         _fc.setRc(q.x, q.y, q.w, q.z, 2000);
     }
-    _wd_checkin = this->get_clock()->now();
+    // _wd_checkin = this->get_clock()->now();
 }
 void INAVBridge::arming_callback(const std_msgs::msg::Bool& arm) {
     if (_fc.isConnected()) {
         if (arm.data) {
-            _fc.setRc(1000, 1000, 1000, 900, 2000);
+            if(!_fc_armed)
+                _fc.setRc(1500, 1500, 1500, 900, 2000);
+            if(_fc.isArmed())
+                _fc_armed = true;
             _wd_checkin = this->get_clock()->now();
         } else {
-            _fc.setRc(1000, 1000, 1000, 900, 1000);
+            _fc_armed = false;
+            _fc.setRc(1500, 1500, 1500, 900, 1000);
             _wd_checkin = this->get_clock()->now();
         }
     }
