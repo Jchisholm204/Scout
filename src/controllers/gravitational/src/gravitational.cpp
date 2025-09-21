@@ -21,16 +21,23 @@
 #include <unistd.h>
 
 Gravitational::Gravitational() : Node("gravity_ctrl") {
-    this->declare_parameter("imu_topic", "/inav_bridge/imu");
-    this->declare_parameter("gyro_topic", "/inav_bridge/gyro");
-    this->declare_parameter("battery_topic", "/inav_bridge/batt");
-    this->declare_parameter("motor_topic", "/inav_bridge/mtr");
-    this->declare_parameter("altitude_topic", "/inav_bridge/altitude");
+    this->declare_parameter("imu_topic", "/inav/imu");
+    this->declare_parameter("gyro_topic", "/inav/gyro");
+    this->declare_parameter("battery_topic", "/inav/batt");
+    this->declare_parameter("motor_topic", "/inav/mtr");
+    this->declare_parameter("altitude_topic", "/inav/altitude");
     this->declare_parameter("hor_lidar_topic", "/lidar");
     this->declare_parameter("vrt_lidar_topic", "/veridar");
     this->declare_parameter("target_topic", "/gtarget");
-    this->declare_parameter("movement_topic", "/inav_bridge/movement");
-    this->declare_parameter("arming_topic", "/inav_bridge/armed");
+    this->declare_parameter("movement_topic", "/inav/movement");
+    this->declare_parameter("arming_topic", "/inav/armed");
+    this->declare_parameter("collide_max", 0.8f);
+    this->declare_parameter("hover_alt", 0.5f);
+    this->declare_parameter("log_level", "none");
+    this->declare_parameter("horizontal_weight", 1);
+    this->declare_parameter("vertical_weight", 1);
+    this->declare_parameter("target_weight", 1);
+    this->declare_parameter("hover_weight", 1);
 
     std::string imu_topic = this->get_parameter("imu_topic").as_string();
     std::string gyro_topic = this->get_parameter("gyro_topic").as_string();
@@ -42,7 +49,43 @@ Gravitational::Gravitational() : Node("gravity_ctrl") {
     std::string target_topic = this->get_parameter("target_topic").as_string();
     std::string movement_topic = this->get_parameter("movement_topic").as_string();
     std::string arming_topic = this->get_parameter("arming_topic").as_string();
+    _collide_max = this->get_parameter("collide_max").as_double();
+    _hover_alt = this->get_parameter("hover_alt").as_double();
+    std::string log_level = this->get_parameter("log_level").as_string();
+    _w_hor = this->get_parameter("horizontal_weight").as_double();
+    _w_ver = this->get_parameter("vertical_weight").as_double();
+    _w_trg = this->get_parameter("target_weight").as_double();
+    _w_hover = this->get_parameter("hover_weight").as_double();
 
+    // Sanitize Parameters
+    if (((int) _collide_max) == -1) {
+        RCLCPP_WARN(this->get_logger(), "`collide_max` is ignored");
+        _collide_max = FLT_MAX;
+    } else if (_collide_max < 0) {
+        std::cerr << "Invalid Parameter: `collide_max`\n Possible options are:\n"
+                  << " - `-1` (considers everything in the enviroment)" << std::endl
+                  << " - (`0`, `15`]" << std::endl;
+        throw std::runtime_error("collide_max invalid argument");
+    }
+
+    // Parse Log Level
+    if (log_level == "none") {
+        _log_level = LogLevel::None;
+    } else if (log_level == "info") {
+        _log_level = LogLevel::Info;
+    } else if (log_level == "warning") {
+        _log_level = LogLevel::Warning;
+    } else if (log_level == "error") {
+        _log_level = LogLevel::Error;
+    } else {
+        std::cerr
+            << "Log Level: [" << log_level << "] is unknown. " << std::endl
+            << "Possible options are:\n - [none]\n - [info]\n - [warning]\n - [error]"
+            << std::endl;
+        throw std::runtime_error("log_level unknown");
+    }
+
+    // Create Subscriptions to drone topics
     _imu_sub = this->create_subscription<geometry_msgs::msg::Vector3>(
         imu_topic, 10,
         std::bind(&Gravitational::_imu_callback, this, std::placeholders::_1));
@@ -68,15 +111,16 @@ Gravitational::Gravitational() : Node("gravity_ctrl") {
         target_topic, 10,
         std::bind(&Gravitational::_target_callback, this, std::placeholders::_1));
 
+    // Create Publishers
     _movement_pub =
         this->create_publisher<geometry_msgs::msg::Quaternion>(movement_topic, 10);
     _arming_pub = this->create_publisher<std_msgs::msg::Bool>(arming_topic, 10);
-    _pose_pub = this->create_publisher<visualization_msgs::msg::Marker>("/target", 10);
+    _pose_pub =
+        this->create_publisher<visualization_msgs::msg::Marker>(target_topic + ".mk", 10);
 
+    // Zero out internal parameters
     _mtr_speed = 0;
     _drone_alt = 0;
-    _ldr_alt = 0;
-
     ZERO_VEC(_g_targ);
     ZERO_VEC(_g_gyro);
     ZERO_VEC(_g_horizontal);
@@ -84,57 +128,89 @@ Gravitational::Gravitational() : Node("gravity_ctrl") {
     ZERO_VEC(_g_realsense);
     ZERO_VEC(_g_last);
 
+    // Setup operational timer
     _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(50),
                                           std::bind(&Gravitational::ctrl_callback, this));
 }
 
 void Gravitational::_imu_callback(const geometry_msgs::msg::Vector3& imu) {
+    // Future Use: Acceleration limits in the real world
     (void) (imu);
 }
 void Gravitational::_gyro_callback(const geometry_msgs::msg::Vector3& gyro) {
+    // Future Use: Internal PID Controller?
     _g_gyro = gyro;
 }
 void Gravitational::_batt_callback(const sensor_msgs::msg::BatteryState& batt) {
+    // Future Use: Compensate for battery drop
     (void) (batt);
 }
 void Gravitational::_motor_callback(const std_msgs::msg::Float32& mtr) {
+    // Future Use: Current Power Calculations
     _mtr_speed = mtr.data;
 }
 void Gravitational::_altitude_callback(const std_msgs::msg::Float32& alt) {
+    // Future Use: Use as source for Fz
     _drone_alt = alt.data;
 }
 void Gravitational::_vldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
-    ZERO_VEC(_g_horizontal)
+    // Zero out the vector
+    ZERO_VEC(_g_vertical);
+
+    // Loop through all LiDAR Points
     for (size_t i = 0; i < ldr.ranges.size(); i++) {
+        // Calcuate angle and distance of measurement
         float angle = ldr.angle_min + i * ldr.angle_increment;
-        if (angle < M_PI) {
-            _g_vertical.z += cos(angle) * ldr.ranges[i];
-            _g_vertical.y += sin(angle) * ldr.ranges[i];
+        float range = ldr.ranges[i];
+        // Adjust the value to max range [0, _collide_max]
+        range = range > _collide_max ? 0 : _collide_max - range;
+        // Calcuate the confidence in the reading [0, 1]
+        float confidence = ldr.intensities[i] / 255.0f;
+        // Calcuate the resultant force
+        float F = range * confidence;
+        // Calcuate the perpendicular forces
+        float Fx = F * cos(angle) / _collide_max;
+        float Fy = F * sin(angle) / _collide_max;
+        // Add or subtract depending on the side of the axis [-PI, PI]
+        if (angle < 0) {
+            _g_vertical.x += Fx;
+            _g_vertical.y += Fy;
         } else {
-            _g_vertical.z -= cos(angle) * ldr.ranges[i];
-            _g_vertical.y -= sin(angle) * ldr.ranges[i];
+            _g_vertical.x -= Fx;
+            _g_vertical.y -= Fy;
         }
     }
 }
 void Gravitational::_hldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
+    // Zero out the vector
     ZERO_VEC(_g_horizontal);
-    float aav = 0;
+
+    // Loop through all LiDAR Points
     for (size_t i = 0; i < ldr.ranges.size(); i++) {
+        // Calcuate angle and distance of measurement
         float angle = ldr.angle_min + i * ldr.angle_increment;
-        aav += angle;
+        float range = ldr.ranges[i];
+        // Adjust the value to max range [0, _collide_max]
+        range = range > _collide_max ? 0 : _collide_max - range;
+        // Calcuate the confidence in the reading [0, 1]
+        float confidence = ldr.intensities[i] / 255.0f;
+        // Calcuate the resultant force
+        float F = range * confidence;
+        // Calcuate the perpendicular forces
+        float Fx = F * cos(angle) / _collide_max;
+        float Fy = F * sin(angle) / _collide_max;
+        // Add or subtract depending on the side of the axis [-PI, PI]
         if (angle < 0) {
-            _g_horizontal.x += cos(angle) * (1/(ldr.ranges[i]+0.001)) * ldr.intensities[i]/255;
-            _g_horizontal.y += sin(angle) * (1/(ldr.ranges[i]+0.001)) * ldr.intensities[i]/255;
+            _g_horizontal.x += Fx;
+            _g_horizontal.y += Fy;
         } else {
-            _g_horizontal.x -= cos(angle) * (1/(ldr.ranges[i]+0.001)) * ldr.intensities[i]/255;
-            _g_horizontal.y -= sin(angle) * (1/(ldr.ranges[i]+0.001)) * ldr.intensities[i]/255;
+            _g_horizontal.x -= Fx;
+            _g_horizontal.y -= Fy;
         }
     }
-    _g_horizontal.x = (_g_horizontal.x / ldr.ranges.size());
-    _g_horizontal.y = (_g_horizontal.y / ldr.ranges.size());
-    RCLCPP_INFO(get_logger(), "angle average: %0.2f\n", aav/ldr.ranges.size());
 }
 void Gravitational::_target_callback(const geometry_msgs::msg::Vector3& target) {
+    // Callback to load the next target (point in 3D space)
     _g_targ = target;
 }
 
@@ -144,18 +220,41 @@ void Gravitational::ctrl_callback(void) {
     armed.data = true;
     _arming_pub->publish(armed);
 
-    // Map x/y [-100,100] -> roll/pitch in radians
-    // e.g. ±20 → ±10 degrees tilt
-    // float max_angle_rad = 180.0f * M_PI / 180.0f;              // 10 degrees
-    // float roll = (_g_horizontal.y) * max_angle_rad;  // left/right tilt
-    // float pitch = (_g_horizontal.x) * max_angle_rad; // forward/back tilt
-    // float yaw = 0.0f;                                         // no yaw rotation for now
+    // Accumulate (Sum) The Forces
+    float Fx = 0, Fy = 0, Fz = 0;
+    Fx += _g_horizontal.x * _w_hor + _g_vertical.x * _w_ver + _g_targ.x * _w_trg;
+    Fy += _g_horizontal.y * _w_hor + _g_vertical.y * _w_ver + _g_targ.y * _w_trg;
+    Fz += _g_horizontal.z * _w_hor + _g_vertical.z * _w_ver + _g_targ.z * _w_trg +
+          _hover_alt * _w_hover;
 
-    // Convert roll/pitch/yaw -> quaternion
-    // tf2::Quaternion q;
-    // q.setRPY(roll, pitch, yaw);
-    // q.normalize();
-    
+    // Normalize the Forces Vector
+    float F = sqrt(pow(Fx, 2) + pow(Fy, 2) + pow(Fz, 2));
+    Fx /= F;
+    Fy /= F;
+    Fz /= F;
+
+    // Save this reading
+    geometry_msgs::msg::Vector3 c;
+    c.x = Fx;
+    c.y = Fy;
+    c.z = Fz;
+
+    // Average with the last value
+    Fx = (Fx + _g_last.x) / 2;
+    Fy = (Fy + _g_last.y) / 2;
+    Fz = (Fz + _g_last.z) / 2;
+
+    // Do not perpetuate the average
+    _g_last = c;
+
+    // Fill Movement Message
+    geometry_msgs::msg::Quaternion q;
+    q.x = Fx;
+    q.y = Fy;
+    q.z = Fz;
+    q.w = 0;
+    _movement_pub->publish(q);
+
     // Fill pose message
     visualization_msgs::msg::Marker m;
     m.header.frame_id = "map";
@@ -163,29 +262,28 @@ void Gravitational::ctrl_callback(void) {
     m.ns = "vector";
     m.type = visualization_msgs::msg::Marker::ARROW;
     m.action = visualization_msgs::msg::Marker::ADD;
+
+    // Origin of the drone is (0, 0, 0)
     geometry_msgs::msg::Point start;
     start.x = 0;
     start.y = 0;
     start.x = 0;
+    // Place the Vector
     geometry_msgs::msg::Point end;
-    end.x = _g_horizontal.x;
-    end.y = _g_horizontal.y;
-    end.z = 0.5;
-    RCLCPP_INFO(get_logger(), "x: %0.2f y: %0.2f\n", _g_horizontal.x, _g_horizontal.y);
+    end.x = Fx;
+    end.y = Fy;
+    end.z = Fz;
+    // Add the points to the pose message
     m.points.push_back(start);
     m.points.push_back(end);
 
-    // m.pose.position.x = 0.0;
-    // m.pose.position.y = 0.0;
-    // m.pose.position.z = 0.0;
-    // m.pose.orientation.x = q.x();
-    // m.pose.orientation.y = q.y();
-    // m.pose.orientation.z = q.z();
-    // m.pose.orientation.w = q.w();
+    if (_log_level >= LogLevel::Info)
+        RCLCPP_INFO(get_logger(), "x: %0.2f y: %0.2f z: %0.2f = %0.2f\n", Fx, Fy, Fz, F);
+
     // Appearance
-    m.scale.x = 0.02;  // shaft diameter
-    m.scale.y = 0.05;  // head diameter
-    m.scale.z = 0.05;  // head length
+    m.scale.x = 0.02; // shaft diameter
+    m.scale.y = 0.05; // head diameter
+    m.scale.z = 0.05; // head length
 
     m.color.a = 1.0;
     m.color.r = 1.0;

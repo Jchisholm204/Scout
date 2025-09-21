@@ -52,10 +52,15 @@ class Gravitational : public rclcpp::Node {
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _pose_pub;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr _arming_pub;
 
-    // Saved Sensor Data
+    // Saved Data
     float _mtr_speed;
     float _drone_alt;
-    float _ldr_alt;
+    float _hover_alt;
+    float _collide_max;
+    float _w_hor;
+    float _w_ver;
+    float _w_trg;
+    float _w_hover;
 
     // Gravitational points
     geometry_msgs::msg::Vector3 _g_targ;
@@ -68,6 +73,14 @@ class Gravitational : public rclcpp::Node {
     // Runtime
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
     void ctrl_callback(void);
+
+    // Logging
+    enum class LogLevel {
+        None,
+        Info,
+        Warning,
+        Error,
+    } _log_level;
 };
 
 #endif
