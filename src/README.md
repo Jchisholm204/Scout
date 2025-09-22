@@ -84,7 +84,7 @@ Uses Lidar data avoid objects.
 #### Topics
 - `[movement_topic]`: Publishes stick commands
 - `[arming_topic]`: Topic to send the arming messages over
-- `[target_topic].mk`: Publishes a `visualization_msgs::msg::Marker` for Rviz compatibility
+- `[target_topic]_mk`: Publishes a `visualization_msgs::msg::Marker` for Rviz compatibility
 
 ## Interfaces
 The interfaces package handles all sensor/device interfacing.

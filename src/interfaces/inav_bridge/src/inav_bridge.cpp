@@ -192,8 +192,12 @@ void INAVBridge::on_debug_msg(const msp::msg::DebugMessage& dbg) {
     RCLCPP_INFO(this->get_logger(), "%s", dbg.debug_msg().c_str());
 }
 void INAVBridge::movement_callback(const geometry_msgs::msg::Quaternion& q) {
-    if (_fc.isArmed() && _fc.isConnected() && _fc_armed) {
-        _fc.setRc(q.x, q.y, q.w, q.z, 2000);
+    if (_fc.isConnected() && _fc_armed) {
+        float x = (q.x < 1000) ? 1000 : (q.x > 2000 ? 2000 : q.x);
+        float y = (q.y < 1000) ? 1000 : (q.y > 2000 ? 2000 : q.y);
+        float z = (q.z < 1000) ? 1000 : (q.z > 2000 ? 2000 : q.z);
+        float w = (q.w < 1000) ? 1000 : (q.w > 2000 ? 2000 : q.w);
+        _fc.setRc(x, y, w, z, 2000);
     }
     // _wd_checkin = this->get_clock()->now();
 }
@@ -210,5 +214,8 @@ void INAVBridge::arming_callback(const std_msgs::msg::Bool& arm) {
             _fc.setRc(1500, 1500, 1500, 900, 1000);
             _wd_checkin = this->get_clock()->now();
         }
+    }
+    else{
+        _fc_armed = false;
     }
 }

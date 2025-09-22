@@ -34,10 +34,10 @@ Gravitational::Gravitational() : Node("gravity_ctrl") {
     this->declare_parameter("collide_max", 0.8f);
     this->declare_parameter("hover_alt", 0.5f);
     this->declare_parameter("log_level", "none");
-    this->declare_parameter("horizontal_weight", 1);
-    this->declare_parameter("vertical_weight", 1);
-    this->declare_parameter("target_weight", 1);
-    this->declare_parameter("hover_weight", 1);
+    this->declare_parameter("horizontal_weight", 1.0f);
+    this->declare_parameter("vertical_weight", 1.0f);
+    this->declare_parameter("target_weight", 1.0f);
+    this->declare_parameter("hover_weight", 1.0f);
 
     std::string imu_topic = this->get_parameter("imu_topic").as_string();
     std::string gyro_topic = this->get_parameter("gyro_topic").as_string();
@@ -116,7 +116,7 @@ Gravitational::Gravitational() : Node("gravity_ctrl") {
         this->create_publisher<geometry_msgs::msg::Quaternion>(movement_topic, 10);
     _arming_pub = this->create_publisher<std_msgs::msg::Bool>(arming_topic, 10);
     _pose_pub =
-        this->create_publisher<visualization_msgs::msg::Marker>(target_topic + ".mk", 10);
+        this->create_publisher<visualization_msgs::msg::Marker>(target_topic + "_mk", 10);
 
     // Zero out internal parameters
     _mtr_speed = 0;
@@ -249,9 +249,9 @@ void Gravitational::ctrl_callback(void) {
 
     // Fill Movement Message
     geometry_msgs::msg::Quaternion q;
-    q.x = Fx;
-    q.y = Fy;
-    q.z = Fz;
+    q.x = Fx * 2000 > 2000 ? 2000 : Fx * 2000;
+    q.y = Fy * 2000 > 2000 ? 2000 : Fy * 2000;
+    q.z = Fz * 2000 > 2000 ? 2000 : Fz * 2000;
     q.w = 0;
     _movement_pub->publish(q);
 
