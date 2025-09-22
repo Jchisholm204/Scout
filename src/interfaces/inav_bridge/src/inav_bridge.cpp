@@ -197,7 +197,7 @@ void INAVBridge::movement_callback(const geometry_msgs::msg::Quaternion& q) {
         float y = (q.y < 1000) ? 1000 : (q.y > 2000 ? 2000 : q.y);
         float z = (q.z < 1000) ? 1000 : (q.z > 2000 ? 2000 : q.z);
         float w = (q.w < 1000) ? 1000 : (q.w > 2000 ? 2000 : q.w);
-        _fc.setRc(x, y, w, z, 2000);
+        _fc.setRc(x, y, z, w, 2000);
     }
     // _wd_checkin = this->get_clock()->now();
 }
@@ -205,13 +205,13 @@ void INAVBridge::arming_callback(const std_msgs::msg::Bool& arm) {
     if (_fc.isConnected()) {
         if (arm.data) {
             if(!_fc_armed)
-                _fc.setRc(1500, 1500, 1500, 900, 2000);
+                _fc.setRc(1500, 1500, 900, 1500, 2000);
             if(_fc.isArmed())
                 _fc_armed = true;
             _wd_checkin = this->get_clock()->now();
         } else {
             _fc_armed = false;
-            _fc.setRc(1500, 1500, 1500, 900, 1000);
+            _fc.setRc(1500, 1500, 900, 1500, 1000);
             _wd_checkin = this->get_clock()->now();
         }
     }
