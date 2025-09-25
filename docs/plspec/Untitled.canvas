@@ -1,0 +1,35 @@
+{
+	"nodes":[
+		{"id":"0a8bf8b78275f5cd","type":"text","text":"Jetson","x":-640,"y":-410,"width":250,"height":60},
+		{"id":"88655c3a8d58a699","type":"file","file":"School/Fourth Year/Capstone497/Specs/CIB USB Spec.md","x":-200,"y":-480,"width":400,"height":200},
+		{"id":"26ffb46d9a2b2dc9","type":"file","file":"School/Fourth Year/Capstone497/Specs/RPLiDAR.md","x":-1070,"y":-40,"width":400,"height":339},
+		{"id":"463b3ce59ccbcdbb","type":"text","text":"UART HAL","x":-535,"y":100,"width":250,"height":60},
+		{"id":"4f38ec8b5dc1a935","type":"file","file":"School/Fourth Year/Capstone497/Specs/RPLiDAR.md","x":-1009,"y":340,"width":400,"height":339},
+		{"id":"a72f10afcaac48ad","type":"text","text":"UART HAL","x":-474,"y":480,"width":250,"height":60},
+		{"id":"396a4ef28e8eb5bb","type":"text","text":"RPLiDAR Driver","x":-125,"y":480,"width":250,"height":60},
+		{"id":"9d624c35e407401e","type":"file","file":"School/Fourth Year/Capstone497/Specs/CIB PCB Specifications.md","x":-325,"y":-920,"width":400,"height":207},
+		{"id":"a3bf0fb7ce3d52b9","type":"text","text":"FC","x":745,"y":-713,"width":250,"height":60},
+		{"id":"a5dffc6f2b363577","type":"text","text":"CSRF Driver","x":900,"y":-480,"width":250,"height":60},
+		{"id":"b7cd5c7e58161465","type":"text","text":"MSP Driver","x":555,"y":-470,"width":250,"height":60},
+		{"id":"b3ee2e57c2832638","type":"file","file":"School/Fourth Year/Capstone497/Specs/RPLiDAR Driver.md","x":-200,"y":94,"width":275,"height":72},
+		{"id":"8428eb863167c70c","type":"file","file":"School/Fourth Year/Capstone497/Specs/Gravitational Controller.md","x":440,"y":-34,"width":400,"height":400},
+		{"id":"47bd7746bfec3967","x":555,"y":-320,"width":400,"height":198,"type":"file","file":"School/Fourth Year/Capstone497/Specs/FC Interface.md"}
+	],
+	"edges":[
+		{"id":"9eb977f6ed739fea","fromNode":"0a8bf8b78275f5cd","fromSide":"right","toNode":"88655c3a8d58a699","toSide":"left","fromEnd":"arrow","label":"USB"},
+		{"id":"db766af4c4894c9f","fromNode":"26ffb46d9a2b2dc9","fromSide":"right","toNode":"463b3ce59ccbcdbb","toSide":"left"},
+		{"id":"1c83d8626cb4bdc7","fromNode":"4f38ec8b5dc1a935","fromSide":"right","toNode":"a72f10afcaac48ad","toSide":"left"},
+		{"id":"00ee737235e8adc3","fromNode":"a72f10afcaac48ad","fromSide":"right","toNode":"396a4ef28e8eb5bb","toSide":"left"},
+		{"id":"548e3d0f4d2feb87","fromNode":"396a4ef28e8eb5bb","fromSide":"top","toNode":"88655c3a8d58a699","toSide":"bottom"},
+		{"id":"0eb23f2489cc4e60","fromNode":"88655c3a8d58a699","fromSide":"right","toNode":"8428eb863167c70c","toSide":"left"},
+		{"id":"2966709bbf8a9cad","fromNode":"a5dffc6f2b363577","fromSide":"top","toNode":"a3bf0fb7ce3d52b9","toSide":"bottom","fromEnd":"arrow"},
+		{"id":"9dbbe68ad80cf7f1","fromNode":"b7cd5c7e58161465","fromSide":"top","toNode":"a3bf0fb7ce3d52b9","toSide":"bottom","fromEnd":"arrow"},
+		{"id":"c4d24899ec26194a","fromNode":"463b3ce59ccbcdbb","fromSide":"right","toNode":"b3ee2e57c2832638","toSide":"left"},
+		{"id":"7d2928c7eaf640d0","fromNode":"b3ee2e57c2832638","fromSide":"right","toNode":"8428eb863167c70c","toSide":"left"},
+		{"id":"6445b381db420355","fromNode":"396a4ef28e8eb5bb","fromSide":"right","toNode":"8428eb863167c70c","toSide":"left"},
+		{"id":"d115af6069c90b0e","fromNode":"8428eb863167c70c","fromSide":"top","toNode":"47bd7746bfec3967","toSide":"bottom"},
+		{"id":"6f1f8ef58f50e6e7","fromNode":"47bd7746bfec3967","fromSide":"top","toNode":"b7cd5c7e58161465","toSide":"bottom"},
+		{"id":"33ec066383813c00","fromNode":"47bd7746bfec3967","fromSide":"top","toNode":"a5dffc6f2b363577","toSide":"bottom"},
+		{"id":"898f69539f2581f0","fromNode":"47bd7746bfec3967","fromSide":"left","toNode":"88655c3a8d58a699","toSide":"right"}
+	]
+}
