@@ -249,9 +249,17 @@ void Gravitational::ctrl_callback(void) {
 
     // Fill Movement Message
     geometry_msgs::msg::Quaternion q;
-    q.x = Fx * 2000 > 2000 ? 2000 : Fx * 2000;
-    q.y = Fy * 2000 > 2000 ? 2000 : Fy * 2000;
-    q.z = Fz * 2000 > 2000 ? 2000 : Fz * 2000;
+#define Fg(i) ((1500+(500*i)) > 2000 ? 2000 : ((i*500)+1500))
+#define Fl(i) ((1500+(500*i)) < 1000 ? 1000 : ((i*500)+1500))
+    q.x = Fg(Fx);
+    q.y = Fg(Fy);
+    q.z = Fg(Fz);
+    // q.x = Fx * 2000 > 2000 ? 2000 : Fx * 2000;
+    // q.x = Fx * 2000 < 1000 ? 1000 : Fx * 2000;
+    // q.y = Fy * 2000 > 2000 ? 2000 : Fy * 2000;
+    // q.y = Fy * 2000 < 1000 ? 1000 : Fy * 2000;
+    // q.z = Fz * 2000 > 2000 ? 2000 : Fz * 2000;
+    // q.z = Fz * 2000 < 1000 ? 1000 : Fz * 2000;
     q.w = 0;
     _movement_pub->publish(q);
 
