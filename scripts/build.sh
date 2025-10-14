@@ -6,7 +6,7 @@
 # It can be changed to bash by modifying the top line
 
 # PKGS_COMMON=("joystick_controller" "interfaces")
-PKGS_COMMON=("interfaces" "controllers")
+PKGS_COMMON=("interfaces" "controllers" "control_board")
 PKGS_JETSON=()
 
 HOSTNAME_JETSON="jetson"
