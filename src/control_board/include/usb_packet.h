@@ -2,8 +2,9 @@
  * @file usb_packet.h
  * @author Jacob Chisholm (Jchisholm204.github.io)
  * @brief USB Packet Declarations
- * @version 0.1
+ * @version 0.2
  * @date 2025-01-12
+ * @modified Last Modified: 2025-10-14
  * 
  * @copyright Copyright (c) 2023
  *
@@ -96,8 +97,8 @@ struct udev_pkt_status {
 } __attribute__((packed));
 
 // USB Packets must be less than 0x40/64 bytes in length
-// static_assert(sizeof(struct udev_pkt_ctrl) <= CTRL_DATA_SZ, "USBD Control Packet Oversize");
-// static_assert(sizeof(struct udev_pkt_status) <= CTRL_DATA_SZ, "USBD Status Packet Oversize");
+static_assert(sizeof(struct udev_pkt_ctrl) <= CTRL_DATA_SZ, "USBD Control Packet Oversize");
+static_assert(sizeof(struct udev_pkt_status) <= CTRL_DATA_SZ, "USBD Status Packet Oversize");
 
 #endif
 
