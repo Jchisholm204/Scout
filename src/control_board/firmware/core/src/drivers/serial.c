@@ -130,17 +130,51 @@ eSerialError serial_init(Serial_t *pHndl, unsigned long baud, pin_t pin_rx, pin_
     return pHndl->state;
 }
 
+eSerialError serial_lock(Serial_t *pHndl, uint32_t lock_code){
+    if(!pHndl) return eSerialNULL;
+    if(pHndl->tx_lock != 0) return eSerialLocked;
+    pHndl->tx_lock = lock_code + 1;
+    return eSerialOK;
+}
+
+eSerialError serial_unlock(Serial_t *pHndl, uint32_t lock_code){
+    if(!pHndl) return eSerialNULL;
+    // Interface is already write unlocked
+    if(!pHndl->tx_lock) return eSerialOK;
+    // Check code before unlocking
+    if(pHndl->tx_lock != (lock_code+1)) return eSerialLocked;
+    // setting to zero unlocks the interface
+    pHndl->tx_lock = 0;
+    return eSerialOK;
+}
+
 eSerialError serial_write(Serial_t *pHndl, char *buf, size_t len, TickType_t timeout){
     if(pHndl == NULL || buf == NULL)
         return eSerialNULL;
     if(pHndl->state != eSerialOK)
         return pHndl->state;
+    if(pHndl->tx_lock != 0) return eSerialLocked;
     if(xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE){
         hal_uart_write_buf(pHndl->UART, buf, len);
         xSemaphoreGive(pHndl->tx_hndl);
         return eSerialOK;
     }
     return eSerialSemphr;
+}
+
+extern eSerialError serial_write_locked(Serial_t *pHndl, char *buf, size_t len, TickType_t timeout, uint32_t lock_code){
+    if(pHndl == NULL || buf == NULL)
+        return eSerialNULL;
+    if(pHndl->state != eSerialOK)
+        return pHndl->state;
+    if(pHndl->tx_lock != (lock_code+1) && pHndl->tx_lock) return eSerialLocked;
+    if(xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE){
+        hal_uart_write_buf(pHndl->UART, buf, len);
+        xSemaphoreGive(pHndl->tx_hndl);
+        return eSerialOK;
+    }
+    return eSerialSemphr;
+    
 }
 
 eSerialError serial_attach(Serial_t *pHndl, StreamBufferHandle_t *buf_hndl){

@@ -28,6 +28,8 @@ enum eSerialError {
     eSerialInitFail,
     // The Serial interface has not been Initialized
     eSerialNoInit,
+    // Serial interface is write locked
+    eSerialLocked,
     // Null reference passed
     eSerialNULL
 };
@@ -38,6 +40,7 @@ typedef struct Serial {
     USART_TypeDef *UART;
     IRQn_Type IRQn;
     FILE *fp;
+    uint32_t tx_lock;
     SemaphoreHandle_t tx_hndl;
     StaticSemaphore_t static_tx_semphr;
     StreamBufferHandle_t *rx_buf;
@@ -57,6 +60,25 @@ typedef struct Serial {
 extern eSerialError serial_init(Serial_t *pHndl, unsigned long baud, pin_t pin_rx, pin_t pin_tx);
 
 /**
+ * @brief Write Lock a serial interface (only allow it to be written to by tasks with a lock_code)
+ * Must use serial_write_locked instead of serial_write for locked interfaces
+ *
+ * @param pHndl Handle to lock
+ * @param lock_code Locking code to use
+ * @return serial error or eSerialOK
+ */
+extern eSerialError serial_lock(Serial_t *pHndl, uint32_t lock_code);
+
+/**
+ * @brief Unlock a locked serial interface
+ *
+ * @param pHndl Handle to unlock
+ * @param lock_code Lock code used when the interface was locked
+ * @return 
+ */
+extern eSerialError serial_unlock(Serial_t *pHndl, uint32_t lock_code);
+
+/**
  * @brief Write to a Serial Interface (BLOCKING)
  *
  * @param pHndl Handle to write to
@@ -66,6 +88,20 @@ extern eSerialError serial_init(Serial_t *pHndl, unsigned long baud, pin_t pin_r
  * @returns eSerialOK or Error
  */
 extern eSerialError serial_write(Serial_t *pHndl, char *buf, size_t len, TickType_t timeout);
+
+/**
+ * @brief Write to a Locked Serial Interface (BLOCKING)
+ *  Must be used when a serial interface is locked.
+ *  Will also work to write to unlocked interfaces
+ *
+ * @param pHndl Handle to write to
+ * @param buf buffer to write
+ * @param len length of buffer (in bytes)
+ * @param timeout timeout to wait for semaphore
+ * @param lock_code The code used to lock the serial interface
+ * @returns eSerialOK or Error
+ */
+extern eSerialError serial_write_locked(Serial_t *pHndl, char *buf, size_t len, TickType_t timeout, uint32_t lock_code);
 
 /**
  * @brief Sttach an RX buffer to a Serial Interface

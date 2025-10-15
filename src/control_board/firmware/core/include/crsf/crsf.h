@@ -15,8 +15,15 @@
 #include "drivers/serial.h"
 #include "hal/pin.h"
 
+#define CRSF_BAUD 420000
+#define CRSF_SERIAL_LOCK 0x1234
+
 typedef enum {
-    eCSRFOK
+    eCSRFOK,
+    eCRSFNULL,
+    eCRSFNoInit,
+    eCRSFInitFail,
+    eCRSFSerialFail
 } eCRSFError;
 
 typedef struct CRSF {
@@ -25,25 +32,30 @@ typedef struct CRSF {
     // Task information (Maybe not needed)
     TaskHandle_t tsk_hndl;
     StaticTask_t tsk_buf;
-    StackType_t  tsk_stack[configMINIMAL_STACK_SIZE];
+    StackType_t tsk_stack[configMINIMAL_STACK_SIZE];
 
     // Recieve Buffer (from serial driver interrupt)
     StreamBufferHandle_t rx_hndl;
     StaticStreamBuffer_t rx_streamBuf;
     uint8_t rx_buf[configMINIMAL_STACK_SIZE];
 
-    // Send buffer (to task)
-    StreamBufferHandle_t tx_hndl;
-    StaticStreamBuffer_t tx_streamBuf;
-    crsf_msg_t tx_buf[configMINIMAL_STACK_SIZE];
-    TaskHandle_t tx_owner;
-
+    // CRSF Packets
+    struct crsf_packets{
+        crsf_gps_t gps;
+        crsf_battery_t batt;
+        crsf_rc_t rc;
+        crsf_attitude_t att;
+        crsf_fcmode_t mode;
+    } pkt;
     eCRSFError state;
 } CRSF_t;
 
-extern eCRSFError crsf_init(CRSF_t* pHndl, Serial_t* pSerial);
-extern eCRSFError crsf_attach(CRSF_t *pHndl, StreamBufferHandle_t *buf_hndl);
-extern eCRSFError crsf_detatch(CRSF_t *pHndl);
-extern eCRSFError crsf_write(CRSF_t *pHndl, crsf_msg_t *pMsg);
+extern eCRSFError crsf_init(CRSF_t* pHndl, Serial_t* pSerial, pin_t srx,
+                            pin_t stx);
+extern eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t *pChannels);
+extern eCRSFError crsf_read_gps(CRSF_t* pHndl, crsf_gps_t *pGPS);
+extern eCRSFError crsf_read_battery(CRSF_t* pHndl, crsf_battery_t *pBattery);
+extern eCRSFError crsf_read_attitude(CRSF_t* pHndl, crsf_attitude_t *pAttitude);
+extern eCRSFError crsf_read_mode(CRSF_t* pHndl, crsf_fcmode_t *pMode);
 
 #endif

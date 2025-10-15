@@ -17,6 +17,8 @@ PenaltyBreakBeforeFirstCallParameter: 50
 PenaltyBreakString: 1000
 PenaltyReturnTypeOnItsOwnLine: 200
 
+AllowAllParametersOfDeclarationOnNextLine: true
+
 # Pointer & reference alignment
 PointerAlignment: Left
 ReferenceAlignment: Left
@@ -37,4 +39,8 @@ SpacesInAngles: false
 # Keep enum entries on separate lines
 AllowShortEnumsOnASingleLine: false
 
+# Control how function calls are broken
+BinPackArguments: false             # Each argument on its own line
+BinPackParameters: false            # Prevents multiple parameters on the same line
+BreakBeforeBinaryOperators: None
 
