@@ -19,7 +19,7 @@ ${BUILD_DIR}/Makefile:
 cmake: ${BUILD_DIR}/Makefile
 
 build: cmake
-	$(MAKE) -C ${BUILD_DIR} --no-print-directory -j4
+	$(MAKE) -C ${BUILD_DIR} --no-print-directory -j$(nprocs)
 
 SRCS := $(shell find . -name '*.[ch]' -or -name '*.[ch]pp')
 %.format: %

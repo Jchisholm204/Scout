@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.21)
 include(./gcc-arm-none-eabi.cmake)
 # set(CMAKE_SYSTEM_NAME Generic)
 
-project(QSET_ARM_FW)
+project(SCOUT_CCB)
 set(PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/core)
 set(RTOS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/FreeRTOS)
 set(DRIVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/driver)
@@ -90,6 +90,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -Wshadow
     -Wconversion
     -fstack-usage
+    # -fdump-rtl-expand
     -g
     -fmessage-length=0
     -ffunction-sections
@@ -118,4 +119,10 @@ target_link_options(${EXECUTABLE} PRIVATE
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${EXECUTABLE}> firmware.elf
     COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:${EXECUTABLE}> firmware.hex
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> firmware.bin)
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> firmware.bin
+    COMMAND find ${CMAKE_BINARY_DIR}/CMakeFiles -name '*.su' -exec cat {} + > ${CMAKE_BINARY_DIR}/firmware.su
+    COMMAND ${CMAKE_COMMAND} -E echo "Looking for dynamic stacks..."
+    COMMAND grep 'dynamic' ${CMAKE_BINARY_DIR}/firmware.su || echo 'No dynamic stacks found!!'
+
+)
+

@@ -1,11 +1,14 @@
 /**
  * @file main.c
- * @author Jacob Chisholm (https://jchisholm.github.io) //
- * @brief QSET USB Arm Control Board
- * @date 2025-01-19
- * @version 2.2
+ * @author Jacob Chisholm (https://Jchisholm204.github.io)
+ * @brief ELEC 498 Capstone - Central Control Board
+ * @version 0.1
+ * @date Created: 2025-1-19
+ * @modified Last Modified: 2025-10-14
  *
+ * @copyright Copyright (c) 2025
  */
+
 
 #include "main.h"
 
@@ -25,12 +28,8 @@
 
 // USB Device Includes
 #include "drivers/stusb/usb.h"
-#include "gripper_ctrl.h"
-#include "limit_switches.h"
-#include "mtr_ctrl.h"
-#include "srv_ctrl.h"
+#include "usb_packet.h"
 #include "test_tsks.h"
-#include "usb_arm_defs.h"
 #include "usb_desc.h"
 
 #define USB_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
@@ -48,12 +47,11 @@ static volatile uint16_t vcom_txSize = 0;
 // USBD Configuration Callback
 static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg);
 
-// Motor Controller Handles
-mtrCtrlHndl_t mtrControllers[ARM_N_MOTORS];
 // USB Task Handle
 static TaskHandle_t usbHndl;
 static StackType_t puUsbStack[USB_STACK_SIZE];
 static StaticTask_t pxUsbTsk;
+
 
 // USB Task
 void vTskUSB(void *pvParams);
@@ -79,26 +77,7 @@ void Init(void) {
 
   // Initialize UART
   serial_init(&Serial3, /*baud*/ 250000, PIN_USART3_RX, PIN_USART3_TX);
-  // Initialize CAN
-  can_init(&CANBus1, CAN_1000KBPS, PIN_CAN1_RX, PIN_CAN1_TX);
-  // can_init(&CANBus2, CAN_1000KBPS, PIN_CAN2_RX, PIN_CAN2_TX);
 
-  // Initialize the PWM Timer for the servos
-  // DO NOT CHANGE THESE VALUES - They work for us control
-  srvCtrl_init((PLL_N / PLL_P) - 1, 9999);
-
-  // Set Servos to default Values - in us
-  srvCtrl_set(eServo1, 1500);
-  srvCtrl_set(eServo2, 1500);
-  srvCtrl_set(eServo3, 1500);
-  srvCtrl_set(eServo4, 1500);
-
-  // Initialize gripper control
-  gripCtrl_init((PLL_N / PLL_P) - 1, 9999);
-  gripCtrl_set(0);
-
-  // Initialize Limit Switches
-  lmtSW_init();
 
   /**
    * Initialize System Tasks...
@@ -108,13 +87,6 @@ void Init(void) {
    */
   usbHndl = xTaskCreateStatic(vTskUSB, "USB", USB_STACK_SIZE, NULL,
                               /*Priority*/ 1, puUsbStack, &pxUsbTsk);
-
-  // Initialize the motor control Tasks
-  //           Motor Control Handle,  Joint ID, AK Mtr Type, CAN ID
-  mtrCtrl_init(&mtrControllers[eJoint1], eJoint1, eAK7010, 0x15);  // 21
-  mtrCtrl_init(&mtrControllers[eJoint2], eJoint2, eAK7010, 0x16);  // 22
-  mtrCtrl_init(&mtrControllers[eJoint3], eJoint3, eAK7010, 0x17);  // 23
-  mtrCtrl_init(&mtrControllers[eJoint4], eJoint4, eAK7010, 0x18);  // 24
 }
 
 void vTskUSB(void *pvParams) {
@@ -141,29 +113,13 @@ void vTskUSB(void *pvParams) {
 static void ctrl_rx(usbd_device *dev, uint8_t evt, uint8_t ep) {
   (void)evt;
   usbd_ep_read(dev, ep, (void *)&udev_ctrl, sizeof(struct udev_pkt_ctrl));
-  // Handling servo changes, nothing else needs to be done
-  if ((enum ePktType)udev_ctrl.hdr.pkt_typ == ePktTypeSrvo) {
-    srvCtrl_set(udev_ctrl.hdr.ctrl_typ, udev_ctrl.servo_ctrl);
-  } else if (udev_ctrl.hdr.pkt_typ == ePktTypeMtr) {
-    enum eArmMotors mtr_id = (enum eArmMotors)udev_ctrl.hdr.ctrl_typ;
-    if (mtr_id >= ARM_N_MOTORS) return;
-    mtrCtrl_update(&mtrControllers[mtr_id],
-                   (struct udev_mtr_ctrl *)&udev_ctrl.mtr_ctrl);
-  } else if (udev_ctrl.hdr.pkt_typ == ePktTypeGrip) {
-    gripCtrl_set(udev_ctrl.grip_ctrl);
-  }
+  // Handle Control rx event
 }
 
 // Triggered when the USB Host requests data from the control interface
 static void ctrl_tx(usbd_device *dev, uint8_t evt, uint8_t ep) {
   (void)evt;
-  // Get the latest data from the motor
-  for (enum eArmMotors m = 0; m < ARM_N_MOTORS; m++) {
-    mtrCtrl_getInfo(&mtrControllers[m],
-                    (struct udev_mtr_info *)&udev_info.mtr[m]);
-  }
-  // Get the latest Limit Switch data
-  udev_info.limit_sw = lmtSW_get();
+  // Get the info
 
   // Write back to the USB Memory
   usbd_ep_write(dev, ep, (void *)&udev_info, sizeof(struct udev_pkt_status));

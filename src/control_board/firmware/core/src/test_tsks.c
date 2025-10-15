@@ -60,7 +60,7 @@ void vTsk_testOnline(void * pvParams){
         fprintf(Serial3.fp, "%s\n", t.str);
         // sleep for 1000 ms
         msg.data[0] = (uint8_t) t.secs;
-        can_write(&CANBus1, &msg, 100);
+        // can_write(&CANBus1, &msg, 100);
         // while(hal_can_send_ready(CAN1, 0) == 0);
         // hal_can_send(CAN1, &msg, 0);
         // if(hal_can_read_ready(CAN1)){

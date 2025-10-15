@@ -121,7 +121,6 @@ int _write(int fd, char *ptr, int len) {
 #endif
         case USART6_IRQn:
 #if (configUSE_SERIAL6 == 1)
-        case USART6_IRQn:
             e = serial_write(&Serial6, ptr, (size_t)len, 10);
             break;
 #endif
