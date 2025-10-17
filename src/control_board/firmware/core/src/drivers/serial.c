@@ -161,7 +161,7 @@ eSerialError serial_write(Serial_t *pHndl, char *buf, size_t len, TickType_t tim
         return eSerialNULL;
     if(pHndl->state != eSerialOK)
         return pHndl->state;
-    // if(pHndl->tx_lock != 0) return eSerialLocked;
+    if(pHndl->tx_lock != 0) return eSerialLocked;
     if(xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE){
         hal_uart_write_buf(pHndl->UART, buf, len);
         xSemaphoreGive(pHndl->tx_hndl);

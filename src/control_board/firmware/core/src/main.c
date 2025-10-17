@@ -94,25 +94,27 @@ void Init(void) {
 
 void vTskUSB(void* pvParams) {
     (void) (pvParams);
-    char msg[] = "USB Task Online";
+    char msg[] = "USB Task Online\n";
     memcpy((void*) vcom_txBuf, msg, sizeof(msg));
     vcom_txSize = sizeof(msg);
     struct systime time;
     gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
     gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
     gpio_write(PIN_LED1, true);
+    eSerialError e = serial_lock(&Serial3, 1234);
+    printf("Got SE %d from lock\n", e);
     // hal_uart_init(UART5, 9600, PIN_UART5_RX, PIN_UART5_TX);
     for (;;) {
         systime_fromTicks(xTaskGetTickCount(), &time);
         systime_getStr(&time);
-        // fprintf(Serial5.fp, "Time: %s\n", time.str);
+        printf("Time: %s\n", time.str);
         eSerialError e;
-        if ((e = serial_write(&Serial5, msg, sizeof(msg), 10)) != eSerialOK)
+        if ((e = serial_write(&Serial5, msg, sizeof(msg)-1, 10)) != eSerialOK)
             vcom_txSize = (uint16_t)snprintf((char*) vcom_txBuf,
                                    VCOM_DATA_SZ,
                                    "Serial 5 Write Fail (%d)\n",
                                    e);
-        if (e != eSerialOK || (e = serial_write(&Serial3, msg, sizeof(msg), 10)) != eSerialOK)
+        if (e != eSerialOK || (e = serial_write_locked(&Serial3, msg, sizeof(msg), 10, 1234)) != eSerialOK)
             vcom_txSize = (uint16_t)snprintf((char*) vcom_txBuf,
                                    VCOM_DATA_SZ,
                                    "Serial 3 Write Fail (%d)\n",
