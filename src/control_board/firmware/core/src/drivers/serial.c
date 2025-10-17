@@ -37,6 +37,7 @@ Serial_t Serial1 = {
     USART1,
     USART1_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -51,6 +52,7 @@ Serial_t Serial2 = {
     USART2,
     USART2_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -65,6 +67,7 @@ Serial_t Serial3 = {
     USART3,
     USART3_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -79,6 +82,7 @@ Serial_t Serial4 = {
     UART4,
     UART4_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -93,6 +97,7 @@ Serial_t Serial5 = {
     UART5,
     UART5_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -107,6 +112,7 @@ Serial_t Serial6 = {
     USART6,
     USART6_IRQn,
     NULL,
+    0,
     NULL,
     {0},
     NULL,
@@ -122,8 +128,10 @@ eSerialError serial_init(Serial_t *pHndl, unsigned long baud, pin_t pin_rx, pin_
         return pHndl->state;
     hal_uart_init(pHndl->UART, baud, pin_tx, pin_rx);
     pHndl->tx_hndl = xSemaphoreCreateMutexStatic(&pHndl->static_tx_semphr);
-    if(pHndl->tx_hndl == NULL)
-        return eSerialInitFail;
+    if(pHndl->tx_hndl == NULL){
+        pHndl->state = eSerialInitFail;
+        return pHndl->state;
+    }
     pHndl->fp = fdopen(pHndl->IRQn, "w");
     xSemaphoreGive(pHndl->tx_hndl);
     pHndl->state = eSerialOK;
@@ -153,7 +161,7 @@ eSerialError serial_write(Serial_t *pHndl, char *buf, size_t len, TickType_t tim
         return eSerialNULL;
     if(pHndl->state != eSerialOK)
         return pHndl->state;
-    if(pHndl->tx_lock != 0) return eSerialLocked;
+    // if(pHndl->tx_lock != 0) return eSerialLocked;
     if(xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE){
         hal_uart_write_buf(pHndl->UART, buf, len);
         xSemaphoreGive(pHndl->tx_hndl);

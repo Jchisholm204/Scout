@@ -19,6 +19,10 @@
 #define CRSF_CHANNEL_BYTES ((CRSF_N_CHANNELS*11)/8)
 #define CRSF_STR_LEN 10
 
+#define CRSF_CHANNEL_MIN 1000
+#define CRSF_CHANNEL_ZERO 1500
+#define CRSF_CHANNEL_MAX 2000
+
 typedef struct {
     uint8_t addr;
     uint8_t length;

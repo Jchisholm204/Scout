@@ -32,6 +32,8 @@ clean:
 # use this line to select the flash tool
 flash: st-flash-lin
 
+gdb:
+	gdb -ex "target extended-remote :4242" build/firmware.elf
 
 # must run "run" command or restart target to start program
 BlackMagic-flash:

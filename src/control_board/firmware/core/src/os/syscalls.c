@@ -96,32 +96,32 @@ int _write(int fd, char *ptr, int len) {
         case 1:
         case USART1_IRQn:
 #if (configUSE_SERIAL1 == 1)
-            e = serial_write(&Serial1, ptr, (size_t)len, 10);
-            break;
+            if((e = serial_write(&Serial1, ptr, (size_t)len, 10)) == eSerialOK)
+                break;
 #endif
         case USART2_IRQn:
 #if (configUSE_SERIAL2 == 1)
-            e = serial_write(&Serial2, ptr, (size_t)len, 10);
+            if((e = serial_write(&Serial2, ptr, (size_t)len, 10)) == eSerialOK)
             break;
 #endif
 #if (configUSE_SERIAL3 == 1)
         case USART3_IRQn:
-            e = serial_write(&Serial3, ptr, (size_t)len, 10);
+            if((e = serial_write(&Serial3, ptr, (size_t)len, 10)) == eSerialOK)
             break;
 #endif
         case UART4_IRQn:
 #if (configUSE_SERIAL4 == 1)
-            e = serial_write(&Serial4, ptr, (size_t)len, 10);
+            if((e = serial_write(&Serial4, ptr, (size_t)len, 10)) == eSerialOK)
             break;
 #endif
         case UART5_IRQn:
 #if (configUSE_SERIAL5 == 1)
-            e = serial_write(&Serial5, ptr, (size_t)len, 10);
+            if((e = serial_write(&Serial5, ptr, (size_t)len, 10)) == eSerialOK)
             break;
 #endif
         case USART6_IRQn:
 #if (configUSE_SERIAL6 == 1)
-            e = serial_write(&Serial6, ptr, (size_t)len, 10);
+            if((e = serial_write(&Serial6, ptr, (size_t)len, 10)) == eSerialOK)
             break;
 #endif
         default:

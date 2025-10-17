@@ -17,13 +17,17 @@
 
 #define CRSF_BAUD 420000
 #define CRSF_SERIAL_LOCK 0x1234
+#define CRSF_WAIT_TICKS 10
 
 typedef enum {
     eCSRFOK,
     eCRSFNULL,
     eCRSFNoInit,
     eCRSFInitFail,
-    eCRSFSerialFail
+    eCRSFTskCreateFail,
+    eCRSFSerialFail,
+    eCRSFSemFail,
+    eCRSFNoPkt,
 } eCRSFError;
 
 typedef struct CRSF {
@@ -38,6 +42,9 @@ typedef struct CRSF {
     StreamBufferHandle_t rx_hndl;
     StaticStreamBuffer_t rx_streamBuf;
     uint8_t rx_buf[configMINIMAL_STACK_SIZE];
+
+    SemaphoreHandle_t tx_hndl;
+    StaticSemaphore_t static_tx_semphr;
 
     // CRSF Packets
     struct crsf_packets{
