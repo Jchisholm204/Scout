@@ -11,9 +11,15 @@
 
 #ifndef _CSRF_H_
 #define _CSRF_H_
+#include "FreeRTOS.h"
+#include "config/sys_cfg.h"
 #include "crsf_types.h"
 #include "drivers/serial.h"
 #include "hal/pin.h"
+#include "semphr.h"
+#include "stream_buffer.h"
+
+#include <stdio.h>
 
 #define CRSF_BAUD 420000
 #define CRSF_SERIAL_LOCK 0x1234
@@ -47,7 +53,7 @@ typedef struct CRSF {
     StaticSemaphore_t static_tx_semphr;
 
     // CRSF Packets
-    struct crsf_packets{
+    struct crsf_packets {
         crsf_gps_t gps;
         crsf_battery_t batt;
         crsf_rc_t rc;
@@ -57,12 +63,14 @@ typedef struct CRSF {
     eCRSFError state;
 } CRSF_t;
 
-extern eCRSFError crsf_init(CRSF_t* pHndl, Serial_t* pSerial, pin_t srx,
+extern eCRSFError crsf_init(CRSF_t* pHndl,
+                            Serial_t* pSerial,
+                            pin_t srx,
                             pin_t stx);
-extern eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t *pChannels);
-extern eCRSFError crsf_read_gps(CRSF_t* pHndl, crsf_gps_t *pGPS);
-extern eCRSFError crsf_read_battery(CRSF_t* pHndl, crsf_battery_t *pBattery);
-extern eCRSFError crsf_read_attitude(CRSF_t* pHndl, crsf_attitude_t *pAttitude);
-extern eCRSFError crsf_read_mode(CRSF_t* pHndl, crsf_fcmode_t *pMode);
+extern eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t* pChannels);
+extern eCRSFError crsf_read_gps(CRSF_t* pHndl, crsf_gps_t* pGPS);
+extern eCRSFError crsf_read_battery(CRSF_t* pHndl, crsf_battery_t* pBattery);
+extern eCRSFError crsf_read_attitude(CRSF_t* pHndl, crsf_attitude_t* pAttitude);
+extern eCRSFError crsf_read_mode(CRSF_t* pHndl, crsf_fcmode_t* pMode);
 
 #endif

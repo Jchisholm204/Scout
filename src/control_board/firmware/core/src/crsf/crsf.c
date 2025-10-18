@@ -113,6 +113,8 @@ void vCRSF_Hndl_tsk(void* pvParams) {
     CRSF_t* pHndl = (CRSF_t*) pvParams;
 
     for (;;) {
+        printf("Hello\n");
+        vTaskDelay(500);
     }
 }
 
