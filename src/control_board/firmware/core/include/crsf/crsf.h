@@ -26,7 +26,7 @@
 #define CRSF_WAIT_TICKS 10
 
 typedef enum {
-    eCSRFOK,
+    eCRSFOK,
     eCRSFNULL,
     eCRSFNoInit,
     eCRSFInitFail,
