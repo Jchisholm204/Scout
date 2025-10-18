@@ -14,22 +14,35 @@
 
 #include <stdint.h>
 
-#define CRSF_DATA_MAXLEN 4
+#define CRSF_DATA_MAXLEN 64
 #define CRSF_N_CHANNELS 16
-#define CRSF_CHANNEL_BYTES ((CRSF_N_CHANNELS*11)/8)
+#define CRSF_CHANNEL_BYTES ((CRSF_N_CHANNELS * 11) / 8)
 #define CRSF_STR_LEN 10
 
 #define CRSF_CHANNEL_MIN 1000
 #define CRSF_CHANNEL_ZERO 1500
 #define CRSF_CHANNEL_MAX 2000
 
-typedef struct {
-    uint8_t addr;
-    uint8_t length;
-    uint8_t type;
-    uint8_t data[CRSF_DATA_MAXLEN];
-    uint8_t crc;
-} crsf_msg_t;
+enum eCRSFDataType {
+    UINT8 = 0,
+    INT8 = 1,
+    UINT16 = 2,
+    INT16 = 3,
+    FLOAT = 8,
+    TEXT_SELECTION = 9,
+    STRING = 10,
+    FOLDER = 11,
+    INFO = 12,
+    COMMAND = 13,
+    OUT_OF_RANGE = 127
+};
+
+enum eCRSFMsgId {
+    CRSFMsgRC = 0x16,
+    CRSFMsgLinkStat = 0x14,
+    CRSFMsgBatt = 0x08,
+    CRSFMsgFlightMode = 0x32,
+};
 
 typedef struct __attribute__((packed)) {
     // degrees / 10_000_000
@@ -80,20 +93,45 @@ typedef struct __attribute__((packed)) {
 } crsf_link_t;
 
 typedef struct __attribute__((packed)) {
-    union __attribute__((packed)) {
-        uint8_t raw[CRSF_CHANNEL_BYTES];
-        uint16_t channel[CRSF_N_CHANNELS];
-    };
+    uint16_t channel[CRSF_N_CHANNELS];
 } crsf_rc_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
+    unsigned int chan0 : 11;
+    unsigned int chan1 : 11;
+    unsigned int chan2 : 11;
+    unsigned int chan3 : 11;
+    unsigned int chan4 : 11;
+    unsigned int chan5 : 11;
+    unsigned int chan6 : 11;
+    unsigned int chan7 : 11;
+    unsigned int chan8 : 11;
+    unsigned int chan9 : 11;
+    unsigned int chan10 : 11;
+    unsigned int chan11 : 11;
+    unsigned int chan12 : 11;
+    unsigned int chan13 : 11;
+    unsigned int chan14 : 11;
+    unsigned int chan15 : 11;
+} crsf_rcp_t;
+
+typedef struct __attribute__((packed)) {
     int16_t pitch;
     int16_t roll;
     int16_t yaw;
 } crsf_attitude_t;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     char mode[CRSF_STR_LEN];
 } crsf_fcmode_t;
+
+typedef struct __attribute__((packed)) {
+    uint8_t addr;
+    uint8_t length;
+    uint8_t type;
+    uint8_t pyld[CRSF_DATA_MAXLEN];
+} crsf_msg_t;
+
+#define csrf_sizeof(msg) (sizeof(msg) + 4 * sizeof(uint8_t))
 
 #endif
