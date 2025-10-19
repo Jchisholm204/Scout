@@ -45,7 +45,7 @@ void Init(void) {
     usbi_init();
 
     // Initialize UART
-    serial_init(&Serial5, /*baud*/ 9600, PIN_UART5_RX, PIN_UART5_TX);
+    serial_init(&Serial5, /*baud*/ CRSF_BAUD, PIN_UART5_RX, PIN_UART5_TX);
 
     /**
      * Initialize System Tasks...

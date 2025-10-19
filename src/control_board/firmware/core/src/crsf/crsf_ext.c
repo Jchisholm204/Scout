@@ -19,13 +19,10 @@
 #include <string.h>
 
 // send/recv methods from crsf_pkt
-extern eCRSFError _send_packet(Serial_t* pSerial,
+extern eCRSFError _crsf_send_packet(Serial_t* pSerial,
                                uint8_t len,
                                enum eCRSFMsgId type,
                                uint8_t* pData);
-extern eCRSFError _recv_packet(
-    Serial_t* pSerial, uint8_t addr, uint8_t len, uint8_t type, void* pData);
-
 eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t* pChannels) {
     if (!pHndl || !pChannels)
         return eCRSFNULL;
@@ -46,25 +43,25 @@ eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t* pChannels) {
     }
 
     // Copy the data into the internal packed form
-    crsf_int_rc_t msg;
-    msg.chan0 = cin.channel[0];
-    msg.chan1 = cin.channel[1];
-    msg.chan2 = cin.channel[2];
-    msg.chan3 = cin.channel[3];
-    msg.chan4 = cin.channel[4];
-    msg.chan5 = cin.channel[5];
-    msg.chan6 = cin.channel[6];
-    msg.chan7 = cin.channel[7];
-    msg.chan8 = cin.channel[8];
-    msg.chan9 = cin.channel[9];
-    msg.chan10 = cin.channel[10];
-    msg.chan11 = cin.channel[11];
-    msg.chan12 = cin.channel[12];
-    msg.chan13 = cin.channel[13];
-    msg.chan14 = cin.channel[14];
-    msg.chan15 = cin.channel[15];
+    _crsf_rc_t msg;
+    msg.chan0 = (unsigned int)cin.channel[0] & 0x07FF;
+    msg.chan1 = (unsigned int)cin.channel[1] & 0x07FF;
+    msg.chan2 = (unsigned int)cin.channel[2] & 0x07FF;
+    msg.chan3 = (unsigned int)cin.channel[3] & 0x07FF;
+    msg.chan4 = (unsigned int)cin.channel[4] & 0x07FF;
+    msg.chan5 = (unsigned int)cin.channel[5] & 0x07FF;
+    msg.chan6 = (unsigned int)cin.channel[6] & 0x07FF;
+    msg.chan7 = (unsigned int)cin.channel[7] & 0x07FF;
+    msg.chan8 = (unsigned int)cin.channel[8] & 0x07FF;
+    msg.chan9 = (unsigned int)cin.channel[9] & 0x07FF;
+    msg.chan10 = (unsigned int)cin.channel[10] & 0x07FF;
+    msg.chan11 = (unsigned int)cin.channel[11] & 0x07FF;
+    msg.chan12 = (unsigned int)cin.channel[12] & 0x07FF;
+    msg.chan13 = (unsigned int)cin.channel[13] & 0x07FF;
+    msg.chan14 = (unsigned int)cin.channel[14] & 0x07FF;
+    msg.chan15 = (unsigned int)cin.channel[15] & 0x07FF;
 
-    return _send_packet(
+    return _crsf_send_packet(
         pHndl->pSerial, CRSF_CHANNEL_BYTES, CRSFMsgRC, (void*) &msg);
 }
 
@@ -77,7 +74,7 @@ eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t* pChannels) {
  * @param size size of internal data
  * @return
  */
-eCRSFError crsf_int_read(CRSF_t* pHndl, void* src, void* dst, size_t size) {
+eCRSFError _crsf_read(CRSF_t* pHndl, void* src, void* dst, size_t size) {
     if (!pHndl)
         return eCRSFNULL;
     if (!src)
@@ -96,17 +93,17 @@ eCRSFError crsf_int_read(CRSF_t* pHndl, void* src, void* dst, size_t size) {
 }
 
 eCRSFError crsf_read_gps(CRSF_t* pHndl, crsf_gps_t* pGPS) {
-    return crsf_int_read(pHndl, &pHndl->pkt.gps, pGPS, sizeof(crsf_gps_t));
+    return _crsf_read(pHndl, &pHndl->pkt.gps, pGPS, sizeof(crsf_gps_t));
 }
 
 eCRSFError crsf_read_battery(CRSF_t* pHndl, crsf_battery_t* pBattery) {
-    return crsf_int_read(pHndl, &pHndl->pkt.batt, pBattery, sizeof(crsf_battery_t));
+    return _crsf_read(pHndl, &pHndl->pkt.batt, pBattery, sizeof(crsf_battery_t));
 }
 
 eCRSFError crsf_read_attitude(CRSF_t* pHndl, crsf_attitude_t* pAttitude) {
-    return crsf_int_read(pHndl, &pHndl->pkt.att, pAttitude, sizeof(crsf_attitude_t));
+    return _crsf_read(pHndl, &pHndl->pkt.att, pAttitude, sizeof(crsf_attitude_t));
 }
 
 eCRSFError crsf_read_mode(CRSF_t* pHndl, crsf_fcmode_t* pMode) {
-    return crsf_int_read(pHndl, &pHndl->pkt.mode, pMode, sizeof(crsf_fcmode_t));
+    return _crsf_read(pHndl, &pHndl->pkt.mode, pMode, sizeof(crsf_fcmode_t));
 }

@@ -11,25 +11,23 @@
 
 #define CRSF_INTERNAL
 #include "crsf/crsf.h"
+#include "crsf/crsf_internal.h"
 #include "crsf/crsf_types.h"
 #include "crsf/crsf_types_internal.h"
 #include "memory.h"
 
-// CRSF crc calculation
-uint8_t crc8(const uint8_t* ptr, uint8_t len);
-
-eCRSFError _send_packet(Serial_t* pSerial,
-                        uint8_t len,
-                        enum eCRSFMsgId type,
-                        uint8_t* pData) {
+eCRSFError _crsf_send_packet(Serial_t* pSerial,
+                             uint8_t len,
+                             enum eCRSFMsgId type,
+                             uint8_t* pData) {
     if (!pSerial)
         return eCRSFNULL;
     if (!pData)
         return eCRSFNULL;
 
-    crsf_int_msg_t msg;
+    _crsf_msg_t msg;
     // Addr = CRSF Addr FC
-    msg.addr = 0xC8;
+    msg.addr = CRSF_ADDR;
     msg.length = len + 2; // type + payload + crc
     msg.type = (uint8_t) type;
 
@@ -40,7 +38,7 @@ eCRSFError _send_packet(Serial_t* pSerial,
     }
 
     // CRC includes type and payload
-    uint8_t crc = crc8(&msg.type, len + 1);
+    uint8_t crc = _crsf_crc8(&msg.type, len + 1);
     msg.pyld[i] = crc;
 
     // Transmit message over UART
@@ -59,8 +57,38 @@ eCRSFError _send_packet(Serial_t* pSerial,
     return eCRSFOK;
 }
 
-eCRSFError _recv_packet(
-    Serial_t* pSerial, uint8_t addr, uint8_t len, uint8_t type, void* pData) {
+eCRSFError _crsf_recv_packet(_crsf_msg_t* pIn, crsf_msg_t* pOut) {
+    if (!pIn || !pOut)
+        return eCRSFNULL;
+    if (pIn->addr != CRSF_ADDR)
+        return eCRSFAddrMisMatch;
+    if (pIn->length >= CRSF_DATA_MAXLEN)
+        return eCRSFNoPkt;
+
+    // Copy prelim fields
+    pOut->id = pIn->type;
+
+    // Check Message CRC
+    uint8_t crc_check = _crsf_crc8((void*)&pIn->type, pIn->length - 1);
+    uint8_t crc_msg = ((uint8_t*)pIn)[pIn->length + 1];
+    if (crc_msg != crc_check)
+        return eCRSFCRCErr;
+    switch ((enum eCRSFMsgId) pIn->type) {
+    case CRSFMsgRC:
+        break;
+    case CRSFMsgLinkStat:
+        break;
+    case CRSFMsgBatt:
+        break;
+    case CRSFMsgFlightMode:
+        break;
+    case CRSFMsgAtt:
+        break;
+    default:
+        return eCRSFIdNoMatch;
+        break;
+    }
+    return eCRSFOK;
 }
 
 unsigned char crc8tab[256] = {
@@ -87,7 +115,7 @@ unsigned char crc8tab[256] = {
     0x84, 0x51, 0xFB, 0x2E, 0x7A, 0xAF, 0x05, 0xD0, 0xAD, 0x78, 0xD2, 0x07,
     0x53, 0x86, 0x2C, 0xF9};
 
-uint8_t crc8(const uint8_t* ptr, uint8_t len) {
+uint8_t _crsf_crc8(const uint8_t* ptr, uint8_t len) {
     uint8_t crc = 0;
     for (uint8_t i = 0; i < len; i++) {
         crc = crc8tab[crc ^ *ptr++];

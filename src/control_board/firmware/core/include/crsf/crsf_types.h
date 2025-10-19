@@ -41,7 +41,8 @@ enum eCRSFMsgId {
     CRSFMsgRC = 0x16,
     CRSFMsgLinkStat = 0x14,
     CRSFMsgBatt = 0x08,
-    CRSFMsgFlightMode = 0x32,
+    CRSFMsgFlightMode = 0x21,
+    CRSFMsgAtt = 0x1E,
 };
 
 typedef struct {
@@ -134,5 +135,17 @@ typedef struct {
 typedef struct {
     char mode[CRSF_STR_LEN];
 } crsf_fcmode_t;
+
+typedef struct {
+    enum eCRSFMsgId id;
+    union{
+        crsf_gps_t gps;
+        crsf_attitude_t att;
+        crsf_battery_t batt;
+        crsf_link_t link;
+        crsf_fcmode_t mode;
+        crsf_rc_t rc;
+    };
+} crsf_msg_t;
 
 #endif

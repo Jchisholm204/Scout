@@ -34,6 +34,9 @@ typedef enum {
     eCRSFSerialFail,
     eCRSFSemFail,
     eCRSFNoPkt,
+    eCRSFAddrMisMatch,
+    eCRSFCRCErr,
+    eCRSFIdNoMatch
 } eCRSFError;
 
 typedef struct CRSF {
@@ -54,6 +57,7 @@ typedef struct CRSF {
 
     // CRSF Packets
     struct crsf_packets {
+        crsf_link_t link;
         crsf_gps_t gps;
         crsf_battery_t batt;
         crsf_rc_t rc;

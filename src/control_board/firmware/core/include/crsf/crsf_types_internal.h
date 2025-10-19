@@ -31,7 +31,7 @@ typedef struct __attribute__((packed)) {
     // meter - 1000m offset
     uint16_t altitude;
     uint8_t sat_count;
-} crsf_int_gps_t;
+} _crsf_gps_t;
 
 typedef struct __attribute__((packed)) {
     // mV * 100
@@ -42,7 +42,7 @@ typedef struct __attribute__((packed)) {
     uint8_t capacity[3];
     // percent (0-100]
     uint8_t percent_remaining;
-} crsf_int_battery_t;
+} _crsf_battery_t;
 
 typedef struct __attribute__((packed)) {
     // dBm *-1
@@ -65,7 +65,7 @@ typedef struct __attribute__((packed)) {
     uint8_t downlink_quality;
     // db
     int8_t downlink_SNR;
-} crsf_int_link_t;
+} _crsf_link_t;
 
 typedef struct __attribute__((packed)) {
     unsigned int chan0 : 11;
@@ -84,24 +84,24 @@ typedef struct __attribute__((packed)) {
     unsigned int chan13 : 11;
     unsigned int chan14 : 11;
     unsigned int chan15 : 11;
-} crsf_int_rc_t;
+} _crsf_rc_t;
 
 typedef struct __attribute__((packed)) {
     int16_t pitch;
     int16_t roll;
     int16_t yaw;
-} crsf_int_attitude_t;
+} _crsf_attitude_t;
 
 typedef struct __attribute__((packed)) {
     char mode[CRSF_STR_LEN];
-} crsf_int_fcmode_t;
+} _crsf_fcmode_t;
 
 typedef struct __attribute__((packed)) {
     uint8_t addr;
     uint8_t length;
     uint8_t type;
     uint8_t pyld[CRSF_DATA_MAXLEN];
-} crsf_int_msg_t;
+} _crsf_msg_t;
 
 // CRSF Internal
 #endif

@@ -98,7 +98,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     --specs=nano.specs
     #$<$<CONFIG:Debug>:-Os -g3>
     #$<$<CONFIG:Release>:-Os -g0>
-    
+    -O2
     )
 
 target_link_options(${EXECUTABLE} PRIVATE
