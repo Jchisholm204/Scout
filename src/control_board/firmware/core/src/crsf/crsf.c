@@ -89,7 +89,7 @@ void vCRSF_Hndl_tsk(void* pvParams) {
         return;
     CRSF_t* pHndl = (CRSF_t*) pvParams;
 
-    crsf_rc_t msg_rc = {1500,
+    crsf_rc_t msg_rc = {{{1500,
                         1500,
                         1500,
                         1500,
@@ -104,7 +104,7 @@ void vCRSF_Hndl_tsk(void* pvParams) {
                         1500,
                         1500,
                         1500,
-                        1500};
+                        1500}}};
 
     gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
 
@@ -118,58 +118,64 @@ void vCRSF_Hndl_tsk(void* pvParams) {
         // MSG RX Logic
         crsf_msg_t valid_msg;
 
-        // Attempt to pull the
-        while (xStreamBufferReceive(pHndl->rx_hndl, &new_byte, 1, 0) == 1) {
-            rx_buf[rx_idx++] = new_byte;
-            if (rx_idx == 1 && new_byte != CRSF_ADDR) {
-                rx_idx = 0;
-                continue;
-            }
-            if (rx_idx == 2 && (new_byte < 2 || new_byte > CRSF_DATA_MAXLEN)) {
-                rx_idx = 0;
-                continue;
-            }
-            if (rx_idx >= 2 && rx_idx == rx_buf[1] + 2) {
-                eCRSFError e = _crsf_recv_packet((void*)&rx_buf, &valid_msg);
-                if (e == eCRSFOK) {
-                    serial_write_locked(&Serial5, rx_buf, rx_buf[1]+2, 10, 2);
-                    printf("Got Msg: %d\n", valid_msg.id);
-                    switch (valid_msg.id) {
-                    case CRSFMsgRC:
-                        memcpy(&pHndl->pkt.rc,
-                               &valid_msg.rc,
-                               sizeof(crsf_rc_t));
-                        break;
-                    case CRSFMsgLinkStat:
-                        memcpy(&pHndl->pkt.link,
-                               &valid_msg.link,
-                               sizeof(crsf_rc_t));
-                        break;
-                    case CRSFMsgBatt:
-                        memcpy(&pHndl->pkt.batt,
-                               &valid_msg.batt,
-                               sizeof(crsf_rc_t));
-                        break;
-                    case CRSFMsgFlightMode:
-                        memcpy(&pHndl->pkt.mode,
-                               &valid_msg.mode,
-                               sizeof(crsf_rc_t));
-                    case CRSFMsgAtt:
-                        memcpy(&pHndl->pkt.mode,
-                               &valid_msg.mode,
-                               sizeof(crsf_rc_t));
-                        break;
-                    }
-                } else {
-                    printf("Error: %d on type=0x%x id=0x%x\n", e, rx_buf[0], valid_msg.id);
-                    char cbuf[5] = "Err ";
-                    cbuf[3] = (uint8_t)e;
-                    serial_write_locked(&Serial5, cbuf, 4, 10, 2);
-                }
-                rx_idx = 0;
-            }
-        }
+        crsf_write_rc(pHndl, &msg_rc);
 
-        vTaskDelay(5);
+        // Attempt to pull the
+        // while (xStreamBufferReceive(pHndl->rx_hndl, &new_byte, 1, 0) == 1) {
+        //     rx_buf[rx_idx++] = new_byte;
+        //     if (rx_idx == 1 && new_byte != CRSF_ADDR) {
+        //         rx_idx = 0;
+        //         continue;
+        //     }
+        //     if (rx_idx == 2 && (new_byte < 2 || new_byte > CRSF_DATA_MAXLEN)) {
+        //         rx_idx = 0;
+        //         continue;
+        //     }
+        //     if (rx_idx >= 2 && rx_idx == rx_buf[1] + 2) {
+        //         eCRSFError e = _crsf_recv_packet((void*) &rx_buf, &valid_msg);
+        //         if (e == eCRSFOK) {
+        //             serial_write_locked(&Serial5, rx_buf, rx_buf[1] + 2, 10, 2);
+        //             printf("Got Msg: %d\n", valid_msg.id);
+        //             switch (valid_msg.id) {
+        //             case CRSFMsgRC:
+        //                 memcpy(&pHndl->pkt.rc,
+        //                        &valid_msg.rc,
+        //                        sizeof(crsf_rc_t));
+        //                 break;
+        //             case CRSFMsgLinkStat:
+        //                 memcpy(&pHndl->pkt.link,
+        //                        &valid_msg.link,
+        //                        sizeof(crsf_rc_t));
+        //                 break;
+        //             case CRSFMsgBatt:
+        //                 memcpy(&pHndl->pkt.batt,
+        //                        &valid_msg.batt,
+        //                        sizeof(crsf_rc_t));
+        //                 break;
+        //             case CRSFMsgFlightMode:
+        //                 memcpy(&pHndl->pkt.mode,
+        //                        &valid_msg.mode,
+        //                        sizeof(crsf_rc_t));
+        //             case CRSFMsgAtt:
+        //                 memcpy(&pHndl->pkt.mode,
+        //                        &valid_msg.mode,
+        //                        sizeof(crsf_rc_t));
+        //                 break;
+        //             }
+        //         } else {
+        //             printf("Error: %d on type=0x%x id=0x%x\n",
+        //                    e,
+        //                    rx_buf[0],
+        //                    valid_msg.id);
+        //             char cbuf[5] = "Err ";
+        //             cbuf[3] = (uint8_t) e;
+        //             serial_write_locked(&Serial5, cbuf, 4, 10, 2);
+        //         }
+        //         rx_idx = 0;
+        //     }
+        // }
+
+        gpio_toggle_pin(PIN_LED1);
+        vTaskDelay(500);
     }
 }

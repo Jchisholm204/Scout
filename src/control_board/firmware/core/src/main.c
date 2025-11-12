@@ -42,7 +42,7 @@ CRSF_t tsk_crsf;
 // Initialize all system Interfaces
 void Init(void) {
     // Init USB Interface
-    usbi_init();
+    // usbi_init();
 
     // Initialize UART
     serial_init(&Serial5, /*baud*/ CRSF_BAUD, PIN_UART5_RX, PIN_UART5_TX);
@@ -54,6 +54,8 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     crsf_init(&tsk_crsf, &Serial3, PIN_USART3_RX, PIN_USART3_TX);
+
+    return;
 }
 
 
