@@ -1,6 +1,0 @@
-[submodule "src/interfaces/inav_bridge/libmsp"]
-	path = src/interfaces/inav_bridge/libmsp
-	url = https://github.com/christianrauch/msp.git
-[submodule "src/interfaces/rplidar_bridge/rplidar_sdk"]
-	path = src/interfaces/rplidar_bridge/rplidar_sdk
-	url = https://github.com/Slamtec/rplidar_sdk.git
