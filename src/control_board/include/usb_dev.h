@@ -23,7 +23,7 @@
 #define UDEV_VERSION "1.0.0"
 #endif
 
-#define UDEV_INTERFACES  0x04
+#define UDEV_INTERFACES  0x02
 
 // Virtual Com Port Interface
 #define VCOM_RXD_EP      0x01
@@ -33,15 +33,6 @@
 #define VCOM_NTF_SZ      0x08
 #define VCOM_NTF_INUM    0x00
 #define VCOM_DATA_INUM   0x01
-
-// Device Control Interface
-#define CTRL_RXD_EP      0x03
-#define CTRL_TXD_EP      0x83
-#define CTRL_DATA_SZ     0x40
-#define CTRL_NTF_EP      0x84
-#define CTRL_NTF_SZ      0x08
-#define CTRL_NTF_INUM    0x02
-#define CTRL_DATA_INUM   0x03
 
 // USB Device Vendor ID:
 //  Use 0xFFFF or 0xFFFE as designated by the USBIF,
