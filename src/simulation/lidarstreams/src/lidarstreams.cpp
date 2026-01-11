@@ -11,13 +11,18 @@
 
 #include "lidarstreams/lidarstreams.hpp"
 
+#include <arpa/inet.h>
 #include <cfloat>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 LidarStreams::LidarStreams() : Node("lidarstreams") {
     this->declare_parameter("lidar_baud", 460800);
     this->declare_parameter("lidar_front_name", "lidar_front_frame");
     this->declare_parameter("lidar_vertical_name", "lidar_vertical_frame");
-    this->declare_parameter("pub_rate", 500);
+    this->declare_parameter("pub_rate", 50);
     this->declare_parameter("lidar_mode", 0);
 
     std::string lidar_front_name = this->get_parameter("lidar_front_name").as_string();
@@ -34,7 +39,23 @@ LidarStreams::LidarStreams() : Node("lidarstreams") {
         throw std::runtime_error("lidar_mode must be greater than 0");
     }
 
-    // Initialize LiDAR
+    // Initialize LiDAR UDP Stream
+    struct sockaddr_in servaddr;
+    if ((_udp_fp = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("Socket creation Failed");
+        exit(EXIT_FAILURE);
+    }
+    memset(&servaddr, 0, sizeof(struct sockaddr_in));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = INADDR_ANY;
+    servaddr.sin_port = htons(PORT);
+
+    if (bind(_udp_fp, (const struct sockaddr*) &servaddr, sizeof(servaddr)) < 0) {
+        perror("Bind Failed");
+        exit(EXIT_FAILURE);
+    }
+    int buffer_size = sizeof(struct lidar_packet); // Only hold one packet's worth of data
+    setsockopt(_udp_fp, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 
     _ls_front_pub =
         this->create_publisher<sensor_msgs::msg::LaserScan>(lidar_front_name, 10);
@@ -50,31 +71,62 @@ LidarStreams::~LidarStreams() {
 }
 
 void LidarStreams::lidar_callback(void) {
-    RCLCPP_INFO(this->get_logger(), "Lidar Callback!\n");
-    sensor_msgs::msg::LaserScan msg;
-    msg.angle_max = 0;
-    msg.angle_min = FLT_MAX;
-    msg.range_max = 0;
-    msg.range_min = FLT_MAX;
-    msg.header.stamp = this->now();
+    // RCLCPP_INFO(this->get_logger(), "Lidar Callback!\n");
 
-    msg.angle_min = 0;
-    msg.angle_max = 2 * M_PI;
-    msg.ranges.reserve(180);
-    msg.intensities.reserve(180);
+    struct lidar_packet ldr_pkt;
+    ssize_t n = recvfrom(_udp_fp, &ldr_pkt, sizeof(struct lidar_packet), MSG_DONTWAIT,
+                         NULL, NULL);
 
-    for (size_t i = 0; i < 180; i++) {
-        float distance = 1.1;
-        msg.ranges.push_back(distance);
-        msg.intensities.push_back(1);
+    if (n < 0 || (size_t) n < sizeof(struct lidar_packet)) {
+        RCLCPP_WARN(this->get_logger(), "Invalid/No Data");
+        return;
+    }
+    RCLCPP_INFO(this->get_logger(), "F: %2.2f T: %2.2f B: %2.2f", ldr_pkt.front[0],
+                ldr_pkt.vertical[0], ldr_pkt.vertical[N_POINTS / 2]);
+
+    sensor_msgs::msg::LaserScan msg_front;
+    msg_front.angle_max = 2 * M_PI;
+    msg_front.angle_min = 0;
+    msg_front.range_max = 50.0;
+    msg_front.range_min = 0;
+    msg_front.header.stamp = this->now();
+    msg_front.ranges.resize(N_POINTS);
+    msg_front.intensities.resize(N_POINTS);
+
+    sensor_msgs::msg::LaserScan msg_vertical;
+    msg_vertical.angle_max = 2 * M_PI;
+    msg_vertical.angle_min = 0;
+    msg_vertical.range_max = 50.0;
+    msg_vertical.range_min = 0;
+    msg_vertical.header.stamp = this->now();
+    msg_vertical.ranges.resize(N_POINTS);
+    msg_vertical.intensities.resize(N_POINTS);
+
+    bool front_null = true;
+    bool vertical_null = true;
+
+    for (size_t i = 0; i < N_POINTS; i++) {
+        msg_front.ranges[i] = (ldr_pkt.front[(N_POINTS - 1) - i]);
+        msg_front.intensities[i] = (1);
+        msg_vertical.ranges[i] = (ldr_pkt.vertical[i]);
+        msg_vertical.intensities[i] = (1);
+        if (ldr_pkt.front[i] < 45) {
+            front_null = false;
+        }
+        if (ldr_pkt.vertical[i] < 45) {
+            vertical_null = false;
+        }
     }
 
-    msg.range_min = 0.1;
-    msg.range_max = 6.0;
-    msg.angle_increment = (msg.angle_max - msg.angle_min) / (msg.ranges.size() - 1);
+    msg_front.angle_increment =
+        (msg_front.angle_max - msg_front.angle_min) / (float) (N_POINTS);
+    msg_vertical.angle_increment =
+        (msg_vertical.angle_max - msg_vertical.angle_min) / (float) (N_POINTS);
 
-    msg.header.frame_id = "lidar_front_frame";
-    _ls_front_pub->publish(msg);
-    msg.header.frame_id = "lidar_vertical_frame";
-    _ls_vertical_pub->publish(msg);
+    msg_front.header.frame_id = "lidar_front_frame";
+    if (!front_null)
+        _ls_front_pub->publish(msg_front);
+    msg_vertical.header.frame_id = "lidar_vertical_frame";
+    if (!vertical_null)
+        _ls_vertical_pub->publish(msg_vertical);
 }

@@ -14,6 +14,15 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
+// Defined in the Liftoff Lidar Mod
+#define N_POINTS 180
+#define PORT 9002
+
+struct lidar_packet {
+    float front[N_POINTS];
+    float vertical[N_POINTS];
+};
+
 class LidarStreams : public rclcpp::Node {
     public:
         LidarStreams();
@@ -22,6 +31,7 @@ class LidarStreams : public rclcpp::Node {
         rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_front_pub;
         rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_vertical_pub;
         rclcpp::TimerBase::SharedPtr _lidar_timer;
+        int _udp_fp = 0;
         void lidar_callback(void);
 };
 

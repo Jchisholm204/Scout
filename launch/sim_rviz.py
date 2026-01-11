@@ -7,7 +7,7 @@ import os
 
 def generate_launch_description():
     # 1. Setup Paths
-    package_dir = get_package_share_directory("interfaces")
+    package_dir = get_package_share_directory("simulation")
     urdf_path = os.path.join(package_dir, 'udrf', 'sjtu_drone.urdf')
 
     with open(urdf_path, 'r') as f:
@@ -45,7 +45,7 @@ def generate_launch_description():
                 '--y', '0',
                 '--z', '0.05',
                 '--yaw', '0',
-                '--pitch', '1.5708',
+                '--pitch', '-1.5708',
                 '--roll', '0',
                 '--frame-id', 'base_link',
                 '--child-frame-id', 'lidar_vertical_frame'
