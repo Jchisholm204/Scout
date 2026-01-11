@@ -18,30 +18,50 @@
 #include "drivers/stusb/usb.h"
 #include "hal/hal_usb.h"
 #include "stm32f446xx.h"
+#include "systime.h"
 #include "task.h"
 #include "usb_desc.h"
-#include "usb_packet.h"
+
+#include <stdio.h>
 
 #define USB_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
 
 // USB Device
-usbd_device udev;
-uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
-// USB Info/Ctrl Packet
-static volatile struct udev_pkt_status udev_info;
-static volatile struct udev_pkt_ctrl udev_ctrl;
+static volatile usbd_device udev;
+static volatile uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
 // USB VCOM Buffers
 static volatile uint8_t vcom_rxBuf[VCOM_DATA_SZ] = {0};
-static volatile uint8_t vcom_txBuf[VCOM_DATA_SZ] = {0};
-static volatile uint16_t vcom_txSize = 0;
+static volatile uint8_t vcom_txBuf[VCOM_DATA_SZ] = "USBHello\n";
+static volatile uint16_t vcom_txSize = 9;
 // USBD Configuration Callback
 static usbd_respond udev_setconf(usbd_device* dev, uint8_t cfg);
 
-// USB Task Handle
-// static TaskHandle_t usbHndl;
-// static StackType_t puUsbStack[USB_STACK_SIZE];
-// static StaticTask_t pxUsbTsk;
+int calls = 0;
 
+static TaskHandle_t usbHndl;
+static StackType_t puUsbStack[USB_STACK_SIZE];
+static StaticTask_t pxUsbTsk;
+
+void vTskUSB(void* pvParams) {
+    (void) (pvParams);
+    char msg[] = "USB Task Online";
+    memcpy((void*) vcom_txBuf, msg, sizeof(msg));
+    vcom_txSize = sizeof(msg);
+    struct systime time;
+    gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
+    gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
+    gpio_write(PIN_LED1, true);
+    for (;;) {
+        systime_fromTicks(xTaskGetTickCount(), &time);
+        // int stlen = strlen(time.str);
+        memcpy((void*) vcom_txBuf, time.str, SYSTIME_STR_LEN);
+        printf("%s", time.str);
+        vcom_txSize = SYSTIME_STR_LEN;
+        gpio_toggle_pin(PIN_LED1);
+        gpio_toggle_pin(PIN_LED2);
+        vTaskDelay(1000);
+    }
+}
 
 void usbi_init(void) {
     // Initialize the USB Device
@@ -60,6 +80,13 @@ void usbi_init(void) {
     // Enable the USB Device
     usbd_enable(&udev, 1);
     usbd_connect(&udev, 1);
+    usbHndl = xTaskCreateStatic(vTskUSB,
+                                "USB",
+                                USB_STACK_SIZE,
+                                NULL,
+                                /*Priority*/ 1,
+                                puUsbStack,
+                                &pxUsbTsk);
 }
 
 // USBD RX/TX Callbacks: Virtual COM Port
@@ -80,13 +107,8 @@ static usbd_respond udev_setconf(usbd_device* dev, uint8_t cfg) {
         usbd_ep_deconfig(dev, VCOM_NTF_EP);
         usbd_ep_deconfig(dev, VCOM_TXD_EP);
         usbd_ep_deconfig(dev, VCOM_RXD_EP);
-        usbd_ep_deconfig(dev, CTRL_NTF_EP);
-        usbd_ep_deconfig(dev, CTRL_TXD_EP);
-        usbd_ep_deconfig(dev, CTRL_RXD_EP);
         usbd_reg_endpoint(dev, VCOM_RXD_EP, 0);
         usbd_reg_endpoint(dev, VCOM_TXD_EP, 0);
-        usbd_reg_endpoint(dev, CTRL_RXD_EP, 0);
-        usbd_reg_endpoint(dev, CTRL_TXD_EP, 0);
         return usbd_ack;
     case 1:
         /* configuring device */
@@ -99,24 +121,13 @@ static usbd_respond udev_setconf(usbd_device* dev, uint8_t cfg) {
                        USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
                        VCOM_DATA_SZ);
         usbd_ep_config(dev, VCOM_NTF_EP, USB_EPTYPE_INTERRUPT, VCOM_NTF_SZ);
-        usbd_ep_config(dev,
-                       CTRL_RXD_EP,
-                       USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
-                       CTRL_DATA_SZ);
-        usbd_ep_config(dev,
-                       CTRL_TXD_EP,
-                       USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
-                       CTRL_DATA_SZ);
-        usbd_ep_config(dev, CTRL_NTF_EP, USB_EPTYPE_INTERRUPT, CTRL_NTF_SZ);
 
         // TODO: Add back these functions
         usbd_reg_endpoint(dev, VCOM_RXD_EP, vcom_rxtx);
         usbd_reg_endpoint(dev, VCOM_TXD_EP, vcom_rxtx);
-        // usbd_reg_endpoint(dev, CTRL_RXD_EP, ctrl_rxtx);
-        // usbd_reg_endpoint(dev, CTRL_TXD_EP, ctrl_rxtx);
 
         usbd_ep_write(dev, VCOM_TXD_EP, 0, 0);
-        usbd_ep_write(dev, CTRL_TXD_EP, 0, 0);
+        usbd_ep_write(dev, VCOM_TXD_EP, 0, 0);
         return usbd_ack;
     default:
         return usbd_fail;

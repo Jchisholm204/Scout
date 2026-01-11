@@ -61,18 +61,6 @@ struct udev_config {
     struct usb_interface_descriptor vcom_data;
     struct usb_endpoint_descriptor vcom_eprx;
     struct usb_endpoint_descriptor vcom_eptx;
-
-    // Arm Control Descriptors
-    struct usb_iad_descriptor ctrl_iad;
-    struct usb_interface_descriptor ctrl;
-    struct usb_cdc_header_desc ctrl_hdr;
-    struct usb_cdc_call_mgmt_desc ctrl_mgmt;
-    struct usb_cdc_acm_desc ctrl_acm;
-    struct usb_cdc_union_desc ctrl_union;
-    struct usb_endpoint_descriptor ctrl_ep;
-    struct usb_interface_descriptor ctrl_data;
-    struct usb_endpoint_descriptor ctrl_eprx;
-    struct usb_endpoint_descriptor ctrl_eptx;
 } __attribute__((packed));
 
 extern void udev_applydesc(usbd_device* dev);
@@ -201,101 +189,7 @@ static const struct udev_config config_desc = {
             .bmAttributes = USB_EPTYPE_BULK,
             .wMaxPacketSize = VCOM_DATA_SZ,
             .bInterval = 0x01,
-        },
-
-    .ctrl_iad =
-        {
-            .bLength = sizeof(struct usb_iad_descriptor),
-            .bDescriptorType = USB_DTYPE_INTERFASEASSOC,
-            .bFirstInterface = CTRL_NTF_INUM,
-            .bInterfaceCount = 2,
-            .bFunctionClass = USB_CLASS_CDC,
-            .bFunctionSubClass = USB_CDC_SUBCLASS_ACM,
-            .bFunctionProtocol = CDC_PROTOCOL,
-            .iFunction = NO_DESCRIPTOR,
-        },
-    .ctrl =
-        {
-            .bLength = sizeof(struct usb_interface_descriptor),
-            .bDescriptorType = USB_DTYPE_INTERFACE,
-            .bInterfaceNumber = CTRL_NTF_INUM,
-            .bAlternateSetting = 0,
-            .bNumEndpoints = 1,
-            .bInterfaceClass = USB_CLASS_CDC,
-            .bInterfaceSubClass = USB_CDC_SUBCLASS_ACM,
-            .bInterfaceProtocol = CDC_PROTOCOL,
-            .iInterface = NO_DESCRIPTOR,
-        },
-    .ctrl_hdr =
-        {
-            .bFunctionLength = sizeof(struct usb_cdc_header_desc),
-            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
-            .bDescriptorSubType = USB_DTYPE_CDC_HEADER,
-            .bcdCDC = VERSION_BCD(1, 1, 0),
-        },
-    .ctrl_mgmt =
-        {
-            .bFunctionLength = sizeof(struct usb_cdc_call_mgmt_desc),
-            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
-            .bDescriptorSubType = USB_DTYPE_CDC_CALL_MANAGEMENT,
-            .bmCapabilities = 0,
-            .bDataInterface = CTRL_DATA_INUM,
-
-        },
-    .ctrl_acm =
-        {
-            .bFunctionLength = sizeof(struct usb_cdc_acm_desc),
-            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
-            .bDescriptorSubType = USB_DTYPE_CDC_ACM,
-            .bmCapabilities = 0,
-        },
-    .ctrl_union =
-        {
-            .bFunctionLength = sizeof(struct usb_cdc_union_desc),
-            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
-            .bDescriptorSubType = USB_DTYPE_CDC_UNION,
-            .bMasterInterface0 = CTRL_NTF_INUM,
-            .bSlaveInterface0 = CTRL_DATA_INUM,
-        },
-    .ctrl_ep =
-        {
-            .bLength = sizeof(struct usb_endpoint_descriptor),
-            .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = CTRL_NTF_EP,
-            .bmAttributes = USB_EPTYPE_INTERRUPT,
-            .wMaxPacketSize = CTRL_NTF_SZ,
-            .bInterval = 0x01,
-        },
-    .ctrl_data =
-        {
-            .bLength = sizeof(struct usb_interface_descriptor),
-            .bDescriptorType = USB_DTYPE_INTERFACE,
-            .bInterfaceNumber = CTRL_DATA_INUM,
-            .bAlternateSetting = 0,
-            .bNumEndpoints = 2,
-            .bInterfaceClass = USB_CLASS_CDC_DATA,
-            .bInterfaceSubClass = USB_SUBCLASS_NONE,
-            .bInterfaceProtocol = USB_PROTO_NONE,
-            .iInterface = NO_DESCRIPTOR,
-        },
-    .ctrl_eptx =
-        {
-            .bLength = sizeof(struct usb_endpoint_descriptor),
-            .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = CTRL_TXD_EP,
-            .bmAttributes = USB_EPTYPE_BULK,
-            .wMaxPacketSize = CTRL_DATA_SZ,
-            .bInterval = 0x01,
-        },
-    .ctrl_eprx =
-        {
-            .bLength = sizeof(struct usb_endpoint_descriptor),
-            .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = CTRL_RXD_EP,
-            .bmAttributes = USB_EPTYPE_BULK,
-            .wMaxPacketSize = CTRL_DATA_SZ,
-            .bInterval = 0x01,
-        },
+        }
 };
 
 // COM Port line coding - Standard Uart

@@ -27,12 +27,12 @@
 // Interfaces
 
 // Serial (UART/USART)
-#define configUSE_SERIAL1 1
+#define configUSE_SERIAL1 0
 #define configUSE_SERIAL2 1
 #define configUSE_SERIAL3 1
-#define configUSE_SERIAL4 1
-#define configUSE_SERIAL5 1
-#define configUSE_SERIAL6 1
+#define configUSE_SERIAL4 0
+#define configUSE_SERIAL5 0
+#define configUSE_SERIAL6 0
 
 // CAN Bus
 #define configUSE_CAN1 0

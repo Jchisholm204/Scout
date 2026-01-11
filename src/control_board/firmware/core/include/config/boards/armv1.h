@@ -9,8 +9,8 @@
  * 
  */
 
-#ifndef _PINS_NUCLEOZE_H_
-#define _PINS_NUCLEOZE_H_
+#ifndef _PINS_ARMV1_H_
+#define _PINS_ARMV1_H_
 #include "hal/pin.h"
 #define _BOARD_CONFIG_
 

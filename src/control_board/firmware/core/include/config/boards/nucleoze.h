@@ -11,19 +11,21 @@
 
 #ifndef _PINS_NUCLEOZE_H_
 #define _PINS_NUCLEOZE_H_
-#include "os/hal/pin.h"
-
-#define cfgSerial Serial3
+#include "hal/pin.h"
+#define _BOARD_CONFIG_
 
 #define PIN_LED1 PIN('B', 0)
 #define PIN_LED2 PIN('B', 7)
 #define PIN_LED3 PIN('B', 14)
 
-// #define PIN_USART2_RX PIN('A', 0)
-// #define PIN_USART2_TX PIN('A', 0)
+#define PIN_USART2_RX PIN('D', 6)
+#define PIN_USART2_TX PIN('D', 5)
 
 #define PIN_USART3_RX PIN('D', 9)
 #define PIN_USART3_TX PIN('D', 8)
+
+#define PIN_USART6_RX PIN('G', 9)
+#define PIN_USART6_TX PIN('G', 14)
 
 // #define PIN_CAN1_RX PIN('A', 0)
 // #define PIN_CAN1_TX PIN('A', 0)
@@ -35,6 +37,9 @@
 #define PIN_USB_DP       PIN('A', 12)
 #define PIN_USB_GPIO_OUT PIN('G', 6)
 #define PIN_USB_GPIO_IN  PIN('G', 7)
+#ifndef USBD_VBUS_DETECT
+#define USBD_VBUS_DETECT
+#endif
 
 #endif
 

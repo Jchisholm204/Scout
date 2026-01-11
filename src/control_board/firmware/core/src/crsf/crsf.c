@@ -75,7 +75,7 @@ eCRSFError crsf_init(CRSF_t* pHndl, Serial_t* pSerial, pin_t srx, pin_t stx) {
         return pHndl->state;
     }
 
-    se = serial_attach(pSerial, &pHndl->rx_hndl);
+    // se = serial_attach(pSerial, &pHndl->rx_hndl);
     if (se != eSerialOK) {
         pHndl->state = eCRSFSerialFail;
         return pHndl->state;
@@ -112,13 +112,13 @@ void vCRSF_Hndl_tsk(void* pvParams) {
     uint8_t new_byte;
     uint8_t rx_buf[CRSF_DATA_MAXLEN] = {0};
     uint8_t rx_idx = 0;
-    serial_lock(&Serial5, 2);
+    // serial_lock(&Serial5, 2);
 
     for (;;) {
         // MSG RX Logic
         crsf_msg_t valid_msg;
 
-        crsf_write_rc(pHndl, &msg_rc);
+        // crsf_write_rc(pHndl, &msg_rc);
 
         // Attempt to pull the
         // while (xStreamBufferReceive(pHndl->rx_hndl, &new_byte, 1, 0) == 1) {
@@ -175,6 +175,7 @@ void vCRSF_Hndl_tsk(void* pvParams) {
         //     }
         // }
 
+        printf("Hello\n");
         gpio_toggle_pin(PIN_LED1);
         vTaskDelay(500);
     }
