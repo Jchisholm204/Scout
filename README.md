@@ -20,6 +20,10 @@ Further documentation is present both within each package/node and under the `do
 The INAV project was used as the firmware for the flight controller.
 ROS communicates with INAV through the MSP protocol.
 
+### Simulation
+Simulation relies on the "Liftoff" flight simulator and the liftoff LiDAR mod.
+See [Jchisholm/LiftoffSimulator](https://github.com/Jchisholm204/LiftoffSimulator) for details about setting up the simulator.
+
 ## Hardware Stack
 The hardware stack is composed of the drone, Jetson, and various sensors.
 
