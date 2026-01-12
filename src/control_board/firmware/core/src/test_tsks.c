@@ -23,7 +23,7 @@
 #include "hal/hal_gpio.h"
 #include "config/pin_cfg.h"
 #include "drivers/canbus.h"
-#include "systime.h"
+#include "os/systime.h"
 
 can_msg_t msg = {
     .id = 12,

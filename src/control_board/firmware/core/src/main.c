@@ -17,9 +17,9 @@
 #include "drivers/canbus.h"
 #include "drivers/serial.h"
 #include "stm32f446xx.h"
-#include "systime.h"
+#include "os/systime.h"
 #include "task.h"
-#include "usb_interface.h"
+#include "usb/usb_interface.h"
 #include "usb_cb_defs.h"
 
 #include <memory.h>
@@ -27,7 +27,7 @@
 #include <string.h>
 
 // Task incldues
-#include "crsf/crsf.h"
+#include "protocols/crsf/crsf.h"
 
 // Task Information Structures
 CRSF_t tsk_crsf;
@@ -35,9 +35,12 @@ CRSF_t tsk_crsf;
 
 // Initialize all system Interfaces
 void Init(void) {
-    // Init USB Interface
+    // Initialize System Clock
     hal_clock_init();
-    usbi_init();
+    // Init USB Interface
+    struct usbi *usbi = usbi_init();
+
+    // Verify system clock is stable after USB init
     hal_clock_init();
 
     // Initialize UART

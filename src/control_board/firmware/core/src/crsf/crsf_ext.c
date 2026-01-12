@@ -12,9 +12,9 @@
 // Mandatory defines for all internal modules
 #define CRSF_INTERNAL
 
-#include "crsf/crsf.h"
-#include "crsf/crsf_types.h"
-#include "crsf/crsf_types_internal.h"
+#include "protocols/crsf/crsf.h"
+#include "protocols/crsf/crsf_types.h"
+#include "protocols/crsf/crsf_types_internal.h"
 
 #include <string.h>
 

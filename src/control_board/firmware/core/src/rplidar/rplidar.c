@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2025
  */
 
-#include "rplidar/rplidar.h"
+#include "protocols/rplidar/rplidar.h"
 
 #define RPLIDAR_BAUD 1234
 #define RPLIDAR_SLOCK 0x7787

@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2025
  */
 
-#include "usb_interface.h"
+#include "usb/usb_interface.h"
 
 #include "FreeRTOS.h"
 #include "config/FreeRTOSConfig.h"
@@ -17,11 +17,11 @@
 #include "config/pin_cfg.h"
 #include "drivers/stusb/usb.h"
 #include "hal/hal_usb.h"
+#include "os/systime.h"
 #include "stm32f446xx.h"
-#include "systime.h"
 #include "task.h"
+#include "usb/usb_desc.h"
 #include "usb_cb_defs.h"
-#include "usb_desc.h"
 #include "usb_packet.h"
 
 #include <stdio.h>

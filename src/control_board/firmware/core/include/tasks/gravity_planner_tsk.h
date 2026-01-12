@@ -13,9 +13,9 @@
 #define _GRAVITY_PLANNER_H_
 #include "FreeRTOS.h"
 #include "config/sys_cfg.h"
-#include "crsf/crsf.h"
+#include "protocols/crsf/crsf.h"
 #include "drone_defs.h"
-#include "rplidar/rplidar.h"
+#include "protocols/rplidar/rplidar.h"
 #include "semphr.h"
 #include "stream_buffer.h"
 

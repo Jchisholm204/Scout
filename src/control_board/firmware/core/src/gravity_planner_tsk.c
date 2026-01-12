@@ -9,7 +9,7 @@
  * @copyright Copyright (c) 2025
  */
 
-#include "gravity_planner_tsk.h"
+#include "tasks/gravity_planner_tsk.h"
 
 extern eGPlanErrror gplan_init(GPlan_t* pHndl,
                                RpLidar_t* pLidarXY,

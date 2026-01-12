@@ -10,10 +10,10 @@
  */
 
 #define CRSF_INTERNAL
-#include "crsf/crsf.h"
-#include "crsf/crsf_internal.h"
-#include "crsf/crsf_types.h"
-#include "crsf/crsf_types_internal.h"
+#include "protocols/crsf/crsf.h"
+#include "protocols/crsf/crsf_internal.h"
+#include "protocols/crsf/crsf_types.h"
+#include "protocols/crsf/crsf_types_internal.h"
 #include "memory.h"
 
 eCRSFError _crsf_send_packet(Serial_t* pSerial,
