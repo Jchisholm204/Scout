@@ -13,105 +13,40 @@
 
 #include "config/nvic.h"
 
-void generic_handler(Serial_t *pHndl) {
-    // MUST read input port to clear iPending bit
-    uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
-    // hal_uart_write_byte(pHndl->UART, rx_data);
-    // Check that a handler exists
-    if (pHndl->rx_buf == NULL || pHndl->state != eSerialOK) {
-        // If there is no handler disable this interrupt
-        hal_uart_enable_rxne(pHndl->UART, false);
-        return;
+Serial_t SerialPort[eSerialN] = {
+    {USART1, USART1_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {USART2, USART2_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {USART3, USART3_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {UART4, UART4_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {UART5, UART5_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {USART6, USART6_IRQn, NULL, {0}, NULL, eSerialNoInit},
+};
+
+Serial_t *serial_init(eSerial serial,
+                      unsigned long baud,
+                      pin_t pin_rx,
+                      pin_t pin_tx) {
+    if (serial >= eSerialN) {
+        return NULL;
     }
-    // If a buffer exists, run the interrupt routine
-    BaseType_t higher_woken = pdFALSE;
-    xStreamBufferSendFromISR(
-        *pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
-    portYIELD_FROM_ISR(higher_woken);
-}
 
-#if (configUSE_SERIAL1 == 1)
-void USART1_IRQHandler(void) {
-    generic_handler(&Serial1);
-}
-Serial_t Serial1 = {
-    USART1, USART1_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-#if (configUSE_SERIAL2 == 1)
-void USART2_IRQHandler(void) {
-    generic_handler(&Serial2);
-}
-Serial_t Serial2 = {
-    USART2, USART2_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-#if (configUSE_SERIAL3 == 1)
-void USART3_IRQHandler(void) {
-    generic_handler(&Serial3);
-}
-Serial_t Serial3 = {
-    USART3, USART3_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-#if (configUSE_SERIAL4 == 1)
-void UART4_IRQHandler(void) {
-    generic_handler(&Serial4);
-}
-Serial_t Serial4 = {UART4, UART4_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-#if (configUSE_SERIAL5 == 1)
-void UART5_IRQHandler(void) {
-    generic_handler(&Serial5);
-}
-Serial_t Serial5 = {UART5, UART5_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-#if (configUSE_SERIAL6 == 1)
-void USART6_IRQHandler(void) {
-    generic_handler(&Serial6);
-}
-Serial_t Serial6 = {
-    USART6, USART6_IRQn, NULL, 0, NULL, {0}, NULL, eSerialNoInit};
-#endif
-
-eSerialError serial_init(Serial_t *pHndl,
-                         unsigned long baud,
-                         pin_t pin_rx,
-                         pin_t pin_tx) {
-    if (!pHndl)
-        return eSerialNULL;
+    // Retrive handle and ensure handle is not initialized
+    Serial_t *pHndl = &SerialPort[serial];
     if (pHndl->state == eSerialOK)
-        return pHndl->state;
+        return NULL;
+
     hal_uart_init(pHndl->UART, baud, pin_tx, pin_rx);
+
     pHndl->tx_hndl = xSemaphoreCreateMutexStatic(&pHndl->static_tx_semphr);
     if (pHndl->tx_hndl == NULL) {
         pHndl->state = eSerialInitFail;
-        return pHndl->state;
+        return NULL;
     }
-    pHndl->fp = fdopen(pHndl->IRQn, "w");
+
     xSemaphoreGive(pHndl->tx_hndl);
     pHndl->state = eSerialOK;
-    return pHndl->state;
-}
 
-eSerialError serial_lock(Serial_t *pHndl, uint32_t lock_code) {
-    if (!pHndl)
-        return eSerialNULL;
-    if (pHndl->tx_lock != 0)
-        return eSerialLocked;
-    pHndl->tx_lock = lock_code + 1;
-    return eSerialOK;
-}
-
-eSerialError serial_unlock(Serial_t *pHndl, uint32_t lock_code) {
-    if (!pHndl)
-        return eSerialNULL;
-    // Interface is already write unlocked
-    if (!pHndl->tx_lock)
-        return eSerialOK;
-    // Check code before unlocking
-    if (pHndl->tx_lock != (lock_code + 1))
-        return eSerialLocked;
-    // setting to zero unlocks the interface
-    pHndl->tx_lock = 0;
-    return eSerialOK;
+    return pHndl;
 }
 
 eSerialError serial_write(Serial_t *pHndl,
@@ -122,27 +57,6 @@ eSerialError serial_write(Serial_t *pHndl,
         return eSerialNULL;
     if (pHndl->state != eSerialOK)
         return pHndl->state;
-    if (pHndl->tx_lock != 0)
-        return eSerialLocked;
-    if (xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE) {
-        hal_uart_write_buf(pHndl->UART, buf, len);
-        xSemaphoreGive(pHndl->tx_hndl);
-        return eSerialOK;
-    }
-    return eSerialSemphr;
-}
-
-extern eSerialError serial_write_locked(Serial_t *pHndl,
-                                        char *buf,
-                                        size_t len,
-                                        TickType_t timeout,
-                                        uint32_t lock_code) {
-    if (pHndl == NULL || buf == NULL)
-        return eSerialNULL;
-    if (pHndl->state != eSerialOK)
-        return pHndl->state;
-    if (pHndl->tx_lock != (lock_code + 1) && pHndl->tx_lock)
-        return eSerialLocked;
     if (xSemaphoreTake(pHndl->tx_hndl, timeout) == pdTRUE) {
         hal_uart_write_buf(pHndl->UART, buf, len);
         xSemaphoreGive(pHndl->tx_hndl);
@@ -175,4 +89,45 @@ eSerialError serial_detach(Serial_t *pHndl) {
     hal_uart_enable_rxne(pHndl->UART, false);
     NVIC_DisableIRQ(pHndl->IRQn);
     return eSerialOK;
+}
+
+void generic_handler(Serial_t *pHndl) {
+    // MUST read input port to clear iPending bit
+    uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
+    // hal_uart_write_byte(pHndl->UART, rx_data);
+    // Check that a handler exists
+    if (pHndl->rx_buf == NULL || pHndl->state != eSerialOK) {
+        // If there is no handler disable this interrupt
+        hal_uart_enable_rxne(pHndl->UART, false);
+        return;
+    }
+    // If a buffer exists, run the interrupt routine
+    BaseType_t higher_woken = pdFALSE;
+    xStreamBufferSendFromISR(
+        *pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
+    portYIELD_FROM_ISR(higher_woken);
+}
+
+void USART1_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial1]);
+}
+
+void USART2_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial2]);
+}
+
+void USART3_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial3]);
+}
+
+void UART4_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial4]);
+}
+
+void UART5_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial5]);
+}
+
+void USART6_IRQHandler(void) {
+    generic_handler(&SerialPort[eSerial6]);
 }
