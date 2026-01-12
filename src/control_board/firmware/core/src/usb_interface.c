@@ -20,51 +20,41 @@
 #include "stm32f446xx.h"
 #include "systime.h"
 #include "task.h"
+#include "usb_cb_defs.h"
 #include "usb_desc.h"
+#include "usb_packet.h"
 
 #include <stdio.h>
 
-#define USB_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
-
 // USB Device
-static volatile usbd_device udev;
-static volatile uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
-// USB VCOM Buffers
-static volatile uint8_t vcom_rxBuf[VCOM_DATA_SZ] = {0};
-static volatile uint8_t vcom_txBuf[VCOM_DATA_SZ] = "USBHello\n";
-static volatile uint16_t vcom_txSize = 9;
+static usbd_device udev;
+static uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
+// Lidar Data transmission interleaving
+static volatile enum eCBLidar lidar_primary_rx = eLidarFront;
+
 // USBD Configuration Callback
-static usbd_respond udev_setconf(usbd_device* dev, uint8_t cfg);
+static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg);
 
-int calls = 0;
+// External Interfacing
+static struct usbi usbi;
+static StaticQueue_t usbi_lidar_rx_front_sqh;
+static struct udev_pkt_lidar usbi_lidar_rx_front_buf[USBI_LIDAR_BUF_SIZE] = {0};
+static StaticQueue_t usbi_lidar_rx_vertical_sqh = {0};
+static struct udev_pkt_lidar usbi_lidar_rx_vertical_buf[USBI_LIDAR_BUF_SIZE] = {
+    0};
+static StaticQueue_t usbi_lidar_tx_front_sqh = {0};
+static struct udev_pkt_lidar usbi_lidar_tx_front_buf[USBI_LIDAR_BUF_SIZE] = {0};
+static StaticQueue_t usbi_lidar_tx_vertical_sqh = {0};
+static struct udev_pkt_lidar usbi_lidar_tx_vertical_buf[USBI_LIDAR_BUF_SIZE] = {
+    0};
+static StaticQueue_t usbi_ctrl_tx_sqh = {0};
+static struct udev_pkt_lidar usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
+static StaticQueue_t usbi_ctrl_rx_sqh = {0};
+static struct udev_pkt_lidar usbi_ctrl_rx_buf[USBI_CTRL_BUF_SIZE] = {0};
 
-static TaskHandle_t usbHndl;
-static StackType_t puUsbStack[USB_STACK_SIZE];
-static StaticTask_t pxUsbTsk;
-
-void vTskUSB(void* pvParams) {
-    (void) (pvParams);
-    char msg[] = "USB Task Online";
-    memcpy((void*) vcom_txBuf, msg, sizeof(msg));
-    vcom_txSize = sizeof(msg);
-    struct systime time;
-    gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
-    gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
-    gpio_write(PIN_LED1, true);
-    for (;;) {
-        systime_fromTicks(xTaskGetTickCount(), &time);
-        // int stlen = strlen(time.str);
-        memcpy((void*) vcom_txBuf, time.str, SYSTIME_STR_LEN);
-        printf("%s", time.str);
-        vcom_txSize = SYSTIME_STR_LEN;
-        gpio_toggle_pin(PIN_LED1);
-        gpio_toggle_pin(PIN_LED2);
-        vTaskDelay(1000);
-    }
-}
-
-void usbi_init(void) {
+struct usbi *usbi_init(void) {
     // Initialize the USB Device
+    // GPIO Initialization
     hal_usb_init_rcc();
     // libusb_stm32 init device
     usbd_init(&udev, &usbd_hw, CDC_EP0_SIZE, usb0_buf, sizeof(usb0_buf));
@@ -80,54 +70,132 @@ void usbi_init(void) {
     // Enable the USB Device
     usbd_enable(&udev, 1);
     usbd_connect(&udev, 1);
-    usbHndl = xTaskCreateStatic(vTskUSB,
-                                "USB",
-                                USB_STACK_SIZE,
-                                NULL,
-                                /*Priority*/ 1,
-                                puUsbStack,
-                                &pxUsbTsk);
+
+    // External Interface Setup
+
+    usbi.lidar_rx_front =
+        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+                           sizeof(struct udev_pkt_lidar),
+                           (uint8_t *) usbi_lidar_rx_front_buf,
+                           &usbi_lidar_rx_front_sqh);
+
+    usbi.lidar_rx_vertical =
+        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+                           sizeof(struct udev_pkt_lidar),
+                           (uint8_t *) usbi_lidar_rx_vertical_buf,
+                           &usbi_lidar_rx_vertical_sqh);
+
+    usbi.lidar_tx_front =
+        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+                           sizeof(struct udev_pkt_lidar),
+                           (uint8_t *) usbi_lidar_tx_front_buf,
+                           &usbi_lidar_tx_front_sqh);
+
+    usbi.lidar_rx_vertical =
+        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+                           sizeof(struct udev_pkt_lidar),
+                           (uint8_t *) usbi_lidar_tx_vertical_buf,
+                           &usbi_lidar_tx_vertical_sqh);
+
+    usbi.ctrl_tx =
+        xQueueCreateStatic(sizeof(struct udev_pkt_ctrl_tx) * USBI_CTRL_BUF_SIZE,
+                           sizeof(struct udev_pkt_ctrl_tx),
+                           (uint8_t *) usbi_ctrl_tx_buf,
+                           &usbi_ctrl_tx_sqh);
+
+    usbi.ctrl_rx =
+        xQueueCreateStatic(sizeof(struct udev_pkt_ctrl_rx) * USBI_CTRL_BUF_SIZE,
+                           sizeof(struct udev_pkt_ctrl_rx),
+                           (uint8_t *) usbi_ctrl_rx_buf,
+                           &usbi_ctrl_rx_sqh);
+
+    return &usbi;
 }
 
-// USBD RX/TX Callbacks: Virtual COM Port
+// USBD RX/TX Callbacks: Control COM Port
 // Triggered during Virtual Communications Interface events
-static void vcom_rxtx(usbd_device* dev, uint8_t evt, uint8_t ep) {
+static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
+    BaseType_t higher_woken = pdFALSE;
     if (evt == usbd_evt_eprx) {
-        usbd_ep_read(dev, ep, (void*) vcom_rxBuf, VCOM_DATA_SZ);
+        struct udev_pkt_ctrl_tx pkt_ctrl_tx = {0};
+        usbd_ep_read(
+            dev, ep, (void *) &pkt_ctrl_tx, sizeof(struct udev_pkt_ctrl_tx));
+        xQueueOverwriteFromISR(usbi.ctrl_tx, &pkt_ctrl_tx, &higher_woken);
     } else {
-        usbd_ep_write(dev, ep, (void*) &vcom_txBuf, vcom_txSize);
-        vcom_txSize = 0;
+        struct udev_pkt_ctrl_rx pkt_ctrl_rx = {0};
+        if (xQueueReceiveFromISR(usbi.ctrl_rx, &pkt_ctrl_rx, &higher_woken) ==
+            pdTRUE) {
+            usbd_ep_write(dev,
+                          ep,
+                          (void *) &pkt_ctrl_rx,
+                          sizeof(struct udev_pkt_ctrl_rx));
+        } else {
+            usbd_ep_write(dev, ep, (void *) 0, 0);
+        }
     }
+    portYIELD_FROM_ISR(higher_woken);
 }
 
-static usbd_respond udev_setconf(usbd_device* dev, uint8_t cfg) {
+static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
+    BaseType_t higher_woken = pdFALSE;
+    struct udev_pkt_lidar pkt_lidar = {0};
+    if (evt == usbd_evt_eprx) {
+        usbd_ep_read(
+            dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_ctrl_tx));
+        QueueHandle_t *q = &usbi.lidar_rx_vertical;
+        if (pkt_lidar.hdr.id == eLidarFront) {
+            q = &usbi.lidar_rx_front;
+        }
+        if (xQueueSendFromISR(*q, &pkt_lidar, &higher_woken) == errQUEUE_FULL) {
+            xQueueOverwriteFromISR(*q, &pkt_lidar, &higher_woken);
+        }
+    } else {
+        // Interleave lidar transmission over a single channel
+        QueueHandle_t *q = &usbi.lidar_tx_vertical;
+        if (lidar_primary_rx == eLidarFront) {
+            *q = usbi.lidar_tx_front;
+            lidar_primary_rx = eLidarVertical;
+        } else {
+            lidar_primary_rx = eLidarFront;
+        }
+        if (xQueueReceiveFromISR(*q, &pkt_lidar, &higher_woken) == pdTRUE) {
+            usbd_ep_write(
+                dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_ctrl_rx));
+        } else {
+            usbd_ep_write(dev, ep, (void *) 0, 0);
+        }
+    }
+    portYIELD_FROM_ISR(higher_woken);
+}
+
+static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg) {
     switch (cfg) {
     case 0:
         /* deconfiguring device */
-        usbd_ep_deconfig(dev, VCOM_NTF_EP);
-        usbd_ep_deconfig(dev, VCOM_TXD_EP);
-        usbd_ep_deconfig(dev, VCOM_RXD_EP);
-        usbd_reg_endpoint(dev, VCOM_RXD_EP, 0);
-        usbd_reg_endpoint(dev, VCOM_TXD_EP, 0);
+        usbd_ep_deconfig(dev, CTRL_NTF_EP);
+        usbd_ep_deconfig(dev, CTRL_TXD_EP);
+        usbd_ep_deconfig(dev, CTRL_RXD_EP);
+        usbd_reg_endpoint(dev, CTRL_RXD_EP, 0);
+        usbd_reg_endpoint(dev, CTRL_TXD_EP, 0);
         return usbd_ack;
     case 1:
         /* configuring device */
         usbd_ep_config(dev,
-                       VCOM_RXD_EP,
+                       CTRL_RXD_EP,
                        USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
-                       VCOM_DATA_SZ);
+                       CTRL_DATA_SZ);
         usbd_ep_config(dev,
-                       VCOM_TXD_EP,
+                       CTRL_TXD_EP,
                        USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
-                       VCOM_DATA_SZ);
-        usbd_ep_config(dev, VCOM_NTF_EP, USB_EPTYPE_INTERRUPT, VCOM_NTF_SZ);
+                       CTRL_DATA_SZ);
+        usbd_ep_config(dev, CTRL_NTF_EP, USB_EPTYPE_INTERRUPT, CTRL_NTF_SZ);
 
         // TODO: Add back these functions
-        usbd_reg_endpoint(dev, VCOM_RXD_EP, vcom_rxtx);
-        usbd_reg_endpoint(dev, VCOM_TXD_EP, vcom_rxtx);
+        usbd_reg_endpoint(dev, CTRL_RXD_EP, ctrl_rxtx);
+        usbd_reg_endpoint(dev, CTRL_TXD_EP, ctrl_rxtx);
 
-        usbd_ep_write(dev, VCOM_TXD_EP, 0, 0);
-        usbd_ep_write(dev, VCOM_TXD_EP, 0, 0);
+        usbd_ep_write(dev, CTRL_TXD_EP, 0, 0);
+        usbd_ep_write(dev, CTRL_TXD_EP, 0, 0);
         return usbd_ack;
     default:
         return usbd_fail;

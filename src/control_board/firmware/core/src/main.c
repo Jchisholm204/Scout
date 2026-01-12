@@ -16,42 +16,22 @@
 #include "config/pin_cfg.h"
 #include "drivers/canbus.h"
 #include "drivers/serial.h"
-#include "hal/hal_usb.h"
 #include "stm32f446xx.h"
 #include "systime.h"
 #include "task.h"
+#include "usb_interface.h"
+#include "usb_cb_defs.h"
 
 #include <memory.h>
 #include <stdio.h>
 #include <string.h>
 
-// USB Device Includes
-#include "drivers/stusb/usb.h"
-#include "test_tsks.h"
-#include "usb_desc.h"
-#include "usb_interface.h"
-
 // Task incldues
 #include "crsf/crsf.h"
 
 // Task Information Structures
-
 CRSF_t tsk_crsf;
 
-void test(void *pvParams){
-    (void)pvParams;
-    gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
-    gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
-    gpio_set_mode(PIN_LED3, GPIO_MODE_OUTPUT);
-    gpio_toggle_pin(PIN_LED2);
-    for(;;){
-        printf("Hello Uart\n");
-        vTaskDelay(500);
-        gpio_toggle_pin(PIN_LED1);
-        gpio_toggle_pin(PIN_LED2);
-        gpio_toggle_pin(PIN_LED3);
-    }
-}
 
 // Initialize all system Interfaces
 void Init(void) {
@@ -63,8 +43,6 @@ void Init(void) {
     // Initialize UART
     serial_init(&Serial3, /*baud*/ 9600, PIN_USART3_RX, PIN_USART3_TX);
 
-    // xTaskCreate(test, "test", 100, NULL, 2, NULL);
-
     /**
      * Initialize System Tasks...
      * All tasks should be initialized as static
@@ -75,7 +53,6 @@ void Init(void) {
 
     return;
 }
-
 
 int main(void) {
     // Call the init function

@@ -32,10 +32,10 @@ static const struct usb_string_descriptor lang_desc =
     USB_ARRAY_DESC(USB_LANGID_ENG_US);
 // Vendor Description - Sent to host as a string, displays with `lsusb`
 static const struct usb_string_descriptor manuf_desc_en =
-    USB_STRING_DESC("QSET USB");
+    USB_STRING_DESC("Scout");
 // Device Description - Shows up next to vendor description
 static const struct usb_string_descriptor prod_desc_en =
-    USB_STRING_DESC("ARM CTRL");
+    USB_STRING_DESC("Drone Control Board");
 
 // USB Device String Table - used to return the device description
 static const struct usb_string_descriptor* const dtable[] = {
@@ -50,17 +50,29 @@ struct udev_config {
     // General Device Attributes
     struct usb_config_descriptor config;
 
-    // Virtual COM Port Descriptors
-    struct usb_iad_descriptor vcom_iad;
-    struct usb_interface_descriptor vcom;
-    struct usb_cdc_header_desc vcom_hdr;
-    struct usb_cdc_call_mgmt_desc vcom_mgmt;
-    struct usb_cdc_acm_desc vcom_acm;
-    struct usb_cdc_union_desc vcom_union;
-    struct usb_endpoint_descriptor vcom_ep;
-    struct usb_interface_descriptor vcom_data;
-    struct usb_endpoint_descriptor vcom_eprx;
-    struct usb_endpoint_descriptor vcom_eptx;
+    // Control EP COM Port Descriptors
+    struct usb_iad_descriptor ctrl_iad;
+    struct usb_interface_descriptor ctrl;
+    struct usb_cdc_header_desc ctrl_hdr;
+    struct usb_cdc_call_mgmt_desc ctrl_mgmt;
+    struct usb_cdc_acm_desc ctrl_acm;
+    struct usb_cdc_union_desc ctrl_union;
+    struct usb_endpoint_descriptor ctrl_ep;
+    struct usb_interface_descriptor ctrl_data;
+    struct usb_endpoint_descriptor ctrl_eprx;
+    struct usb_endpoint_descriptor ctrl_eptx;
+
+    // Lidar COM Port Descriptors
+    struct usb_iad_descriptor lidar_iad;
+    struct usb_interface_descriptor lidar;
+    struct usb_cdc_header_desc lidar_hdr;
+    struct usb_cdc_call_mgmt_desc lidar_mgmt;
+    struct usb_cdc_acm_desc lidar_acm;
+    struct usb_cdc_union_desc lidar_union;
+    struct usb_endpoint_descriptor lidar_ep;
+    struct usb_interface_descriptor lidar_data;
+    struct usb_endpoint_descriptor lidar_eprx;
+    struct usb_endpoint_descriptor lidar_eptx;
 } __attribute__((packed));
 
 extern void udev_applydesc(usbd_device* dev);
@@ -96,8 +108,7 @@ static const struct udev_config config_desc = {
             .bmAttributes = USB_CFG_ATTR_RESERVED | USB_CFG_ATTR_SELFPOWERED,
             .bMaxPower = USB_CFG_POWER_MA(100),
         },
-
-    .vcom_iad =
+    .ctrl_iad =
         {
             .bLength = sizeof(struct usb_iad_descriptor),
             .bDescriptorType = USB_DTYPE_INTERFASEASSOC,
@@ -108,11 +119,11 @@ static const struct udev_config config_desc = {
             .bFunctionProtocol = CDC_PROTOCOL,
             .iFunction = NO_DESCRIPTOR,
         },
-    .vcom =
+    .ctrl =
         {
             .bLength = sizeof(struct usb_interface_descriptor),
             .bDescriptorType = USB_DTYPE_INTERFACE,
-            .bInterfaceNumber = VCOM_NTF_INUM,
+            .bInterfaceNumber = CTRL_NTF_INUM,
             .bAlternateSetting = 0,
             .bNumEndpoints = 1,
             .bInterfaceClass = USB_CLASS_CDC,
@@ -120,14 +131,14 @@ static const struct udev_config config_desc = {
             .bInterfaceProtocol = CDC_PROTOCOL,
             .iInterface = NO_DESCRIPTOR,
         },
-    .vcom_hdr =
+    .ctrl_hdr =
         {
             .bFunctionLength = sizeof(struct usb_cdc_header_desc),
             .bDescriptorType = USB_DTYPE_CS_INTERFACE,
             .bDescriptorSubType = USB_DTYPE_CDC_HEADER,
             .bcdCDC = VERSION_BCD(1, 1, 0),
         },
-    .vcom_mgmt =
+    .ctrl_mgmt =
         {
             .bFunctionLength = sizeof(struct usb_cdc_call_mgmt_desc),
             .bDescriptorType = USB_DTYPE_CS_INTERFACE,
@@ -136,14 +147,14 @@ static const struct udev_config config_desc = {
             .bDataInterface = 1,
 
         },
-    .vcom_acm =
+    .ctrl_acm =
         {
             .bFunctionLength = sizeof(struct usb_cdc_acm_desc),
             .bDescriptorType = USB_DTYPE_CS_INTERFACE,
             .bDescriptorSubType = USB_DTYPE_CDC_ACM,
             .bmCapabilities = 0,
         },
-    .vcom_union =
+    .ctrl_union =
         {
             .bFunctionLength = sizeof(struct usb_cdc_union_desc),
             .bDescriptorType = USB_DTYPE_CS_INTERFACE,
@@ -151,20 +162,20 @@ static const struct udev_config config_desc = {
             .bMasterInterface0 = 0,
             .bSlaveInterface0 = 1,
         },
-    .vcom_ep =
+    .ctrl_ep =
         {
             .bLength = sizeof(struct usb_endpoint_descriptor),
             .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = VCOM_NTF_EP,
+            .bEndpointAddress = CTRL_NTF_EP,
             .bmAttributes = USB_EPTYPE_INTERRUPT,
-            .wMaxPacketSize = VCOM_NTF_SZ,
+            .wMaxPacketSize = CTRL_NTF_SZ,
             .bInterval = 0x01,
         },
-    .vcom_data =
+    .ctrl_data =
         {
             .bLength = sizeof(struct usb_interface_descriptor),
             .bDescriptorType = USB_DTYPE_INTERFACE,
-            .bInterfaceNumber = VCOM_DATA_INUM,
+            .bInterfaceNumber = CTRL_DATA_INUM,
             .bAlternateSetting = 0,
             .bNumEndpoints = 2,
             .bInterfaceClass = USB_CLASS_CDC_DATA,
@@ -172,25 +183,117 @@ static const struct udev_config config_desc = {
             .bInterfaceProtocol = USB_PROTO_NONE,
             .iInterface = NO_DESCRIPTOR,
         },
-    .vcom_eptx =
+    .ctrl_eptx =
         {
             .bLength = sizeof(struct usb_endpoint_descriptor),
             .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = VCOM_TXD_EP,
+            .bEndpointAddress = CTRL_TXD_EP,
             .bmAttributes = USB_EPTYPE_BULK,
-            .wMaxPacketSize = VCOM_DATA_SZ,
+            .wMaxPacketSize = CTRL_DATA_SZ,
             .bInterval = 0x01,
         },
-    .vcom_eprx =
+    .ctrl_eprx =
         {
             .bLength = sizeof(struct usb_endpoint_descriptor),
             .bDescriptorType = USB_DTYPE_ENDPOINT,
-            .bEndpointAddress = VCOM_RXD_EP,
+            .bEndpointAddress = CTRL_RXD_EP,
             .bmAttributes = USB_EPTYPE_BULK,
-            .wMaxPacketSize = VCOM_DATA_SZ,
+            .wMaxPacketSize = CTRL_DATA_SZ,
             .bInterval = 0x01,
-        }
-};
+        },
+
+    .lidar_iad =
+        {
+            .bLength = sizeof(struct usb_iad_descriptor),
+            .bDescriptorType = USB_DTYPE_INTERFASEASSOC,
+            .bFirstInterface = 0,
+            .bInterfaceCount = 2,
+            .bFunctionClass = USB_CLASS_CDC,
+            .bFunctionSubClass = USB_CDC_SUBCLASS_ACM,
+            .bFunctionProtocol = CDC_PROTOCOL,
+            .iFunction = NO_DESCRIPTOR,
+        },
+    .lidar =
+        {
+            .bLength = sizeof(struct usb_interface_descriptor),
+            .bDescriptorType = USB_DTYPE_INTERFACE,
+            .bInterfaceNumber = LIDAR_NTF_INUM,
+            .bAlternateSetting = 0,
+            .bNumEndpoints = 1,
+            .bInterfaceClass = USB_CLASS_CDC,
+            .bInterfaceSubClass = USB_CDC_SUBCLASS_ACM,
+            .bInterfaceProtocol = CDC_PROTOCOL,
+            .iInterface = NO_DESCRIPTOR,
+        },
+    .lidar_hdr =
+        {
+            .bFunctionLength = sizeof(struct usb_cdc_header_desc),
+            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
+            .bDescriptorSubType = USB_DTYPE_CDC_HEADER,
+            .bcdCDC = VERSION_BCD(1, 1, 0),
+        },
+    .lidar_mgmt =
+        {
+            .bFunctionLength = sizeof(struct usb_cdc_call_mgmt_desc),
+            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
+            .bDescriptorSubType = USB_DTYPE_CDC_CALL_MANAGEMENT,
+            .bmCapabilities = 0,
+            .bDataInterface = 1,
+
+        },
+    .lidar_acm =
+        {
+            .bFunctionLength = sizeof(struct usb_cdc_acm_desc),
+            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
+            .bDescriptorSubType = USB_DTYPE_CDC_ACM,
+            .bmCapabilities = 0,
+        },
+    .lidar_union =
+        {
+            .bFunctionLength = sizeof(struct usb_cdc_union_desc),
+            .bDescriptorType = USB_DTYPE_CS_INTERFACE,
+            .bDescriptorSubType = USB_DTYPE_CDC_UNION,
+            .bMasterInterface0 = 0,
+            .bSlaveInterface0 = 1,
+        },
+    .lidar_ep =
+        {
+            .bLength = sizeof(struct usb_endpoint_descriptor),
+            .bDescriptorType = USB_DTYPE_ENDPOINT,
+            .bEndpointAddress = LIDAR_NTF_EP,
+            .bmAttributes = USB_EPTYPE_INTERRUPT,
+            .wMaxPacketSize = LIDAR_NTF_SZ,
+            .bInterval = 0x01,
+        },
+    .lidar_data =
+        {
+            .bLength = sizeof(struct usb_interface_descriptor),
+            .bDescriptorType = USB_DTYPE_INTERFACE,
+            .bInterfaceNumber = LIDAR_DATA_INUM,
+            .bAlternateSetting = 0,
+            .bNumEndpoints = 2,
+            .bInterfaceClass = USB_CLASS_CDC_DATA,
+            .bInterfaceSubClass = USB_SUBCLASS_NONE,
+            .bInterfaceProtocol = USB_PROTO_NONE,
+            .iInterface = NO_DESCRIPTOR,
+        },
+    .lidar_eptx =
+        {
+            .bLength = sizeof(struct usb_endpoint_descriptor),
+            .bDescriptorType = USB_DTYPE_ENDPOINT,
+            .bEndpointAddress = LIDAR_TXD_EP,
+            .bmAttributes = USB_EPTYPE_BULK,
+            .wMaxPacketSize = LIDAR_DATA_SZ,
+            .bInterval = 0x01,
+        },
+    .lidar_eprx = {
+        .bLength = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType = USB_DTYPE_ENDPOINT,
+        .bEndpointAddress = LIDAR_RXD_EP,
+        .bmAttributes = USB_EPTYPE_BULK,
+        .wMaxPacketSize = LIDAR_DATA_SZ,
+        .bInterval = 0x01,
+    }};
 
 // COM Port line coding - Standard Uart
 static struct usb_cdc_line_coding cdc_line = {

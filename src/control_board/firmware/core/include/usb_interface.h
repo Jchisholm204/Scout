@@ -1,7 +1,7 @@
 /**
  * @file usb_interface.h
  * @author Jacob Chisholm (https://Jchisholm204.github.io)
- * @brief 
+ * @brief
  * @version 0.1
  * @date Created: 2025-10-17
  * @modified Last Modified: 2025-10-17
@@ -12,7 +12,30 @@
 #ifndef _USB_INTERFACE_H_
 #define _USB_INTERFACE_H_
 
-extern void usbi_init(void);
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "queue.h"
+#include "usb_cb_defs.h"
+#include "usb_packet.h"
 
+// Lidar Buffer size (number of usb packets)
+#define USBI_LIDAR_BUF_SIZE 8
+
+// Control Buffer size
+// Only keep the most recent control packet
+#define USBI_CTRL_BUF_SIZE 1
+
+struct usbi {
+    // RX/TX From side of Device
+    QueueHandle_t lidar_rx_front;
+    QueueHandle_t lidar_rx_vertical;
+    QueueHandle_t lidar_tx_front;
+    QueueHandle_t lidar_tx_vertical;
+    // RX/TX From side of host
+    QueueHandle_t ctrl_tx;
+    QueueHandle_t ctrl_rx;
+};
+
+extern struct usbi * usbi_init(void);
 
 #endif

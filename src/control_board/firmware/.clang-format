@@ -20,8 +20,8 @@ PenaltyReturnTypeOnItsOwnLine: 200
 AllowAllParametersOfDeclarationOnNextLine: true
 
 # Pointer & reference alignment
-PointerAlignment: Left
-ReferenceAlignment: Left
+PointerAlignment: Right
+ReferenceAlignment: Right
 
 # Namespace formatting
 NamespaceIndentation: None
