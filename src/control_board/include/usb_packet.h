@@ -26,20 +26,20 @@
 
 struct udev_pkt_ctrl_tx {
     union {
-        float data[3];
         struct {
-            float x, y, z;
+            float x, y, z, w;
         };
+        float data[4];
     } vel;
     uint8_t mode;
 } __attribute__((packed));
 
 struct udev_pkt_ctrl_rx {
     union {
-        float data[3];
         struct {
-            float x, y, z;
+            float x, y, z, w;
         };
+        float data[4];
     } vel;
     uint8_t vBatt;
     uint8_t rssi;
@@ -52,7 +52,12 @@ struct udev_pkt_lidar {
         uint8_t id : 1;
         uint8_t sequence : 7;
     } __attribute__((packed)) hdr;
-    float data[15];
+    struct {
+        // angle = angle / 64.0
+        uint16_t angle;
+        // distance (mm) = distance / 4.0
+        uint16_t distance;
+    } data[15];
 } __attribute__((packed));
 
 // USB Packets must be less than 0x40/64 bytes in length
