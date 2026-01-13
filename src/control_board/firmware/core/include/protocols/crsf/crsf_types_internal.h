@@ -16,8 +16,7 @@
 
 #define CRSF_DATA_MAXLEN 64
 #define CRSF_STR_LEN 10
-
-#ifdef CRSF_INTERNAL
+#define CRSF_ADDR 0xC8
 
 typedef struct __attribute__((packed)) {
     // degrees / 10_000_000
@@ -100,11 +99,14 @@ typedef struct __attribute__((packed)) {
     uint8_t addr;
     uint8_t length;
     uint8_t type;
-    uint8_t pyld[CRSF_DATA_MAXLEN];
+    union {
+        uint8_t pyld[CRSF_DATA_MAXLEN];
+        _crsf_link_t link;
+        _crsf_battery_t batt;
+        _crsf_rc_t rc;
+        _crsf_attitude_t att;
+        _crsf_fcmode_t mode;
+    };
 } _crsf_msg_t;
 
-// CRSF Internal
 #endif
-
-#endif
-

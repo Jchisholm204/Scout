@@ -12,10 +12,7 @@
 #ifndef _CSRF_H_
 #define _CSRF_H_
 #include "FreeRTOS.h"
-#include "config/sys_cfg.h"
 #include "crsf_types.h"
-#include "drivers/serial.h"
-#include "hal/pin.h"
 #include "semphr.h"
 #include "stream_buffer.h"
 
@@ -23,7 +20,7 @@
 
 #define CRSF_BAUD 420000
 #define CRSF_SERIAL_LOCK 0x1234
-#define CRSF_WAIT_TICKS 10
+#define CRSF_TIMEOUT_MS 100
 
 typedef enum {
     eCRSFOK,
@@ -31,29 +28,35 @@ typedef enum {
     eCRSFNoInit,
     eCRSFInitFail,
     eCRSFTskCreateFail,
-    eCRSFSerialFail,
     eCRSFSemFail,
     eCRSFNoPkt,
     eCRSFAddrMisMatch,
+    eCRSFPktOverLen,
     eCRSFCRCErr,
-    eCRSFIdNoMatch
+    eCRSFIdNoMatch,
+    eCRSFTimeout
 } eCRSFError;
 
 typedef struct CRSF {
-    Serial_t* pSerial;
-
     // Task information (Maybe not needed)
-    TaskHandle_t tsk_hndl;
-    StaticTask_t tsk_buf;
-    StackType_t tsk_stack[configMINIMAL_STACK_SIZE];
+    struct {
+        TaskHandle_t hndl;
+        StaticTask_t static_tsk;
+        StackType_t stack[configMINIMAL_STACK_SIZE];
+    } tsk;
 
     // Recieve Buffer (from serial driver interrupt)
-    StreamBufferHandle_t rx_hndl;
-    StaticStreamBuffer_t rx_streamBuf;
-    uint8_t rx_buf[configMINIMAL_STACK_SIZE];
+    struct {
+        StreamBufferHandle_t hndl;
+        StaticStreamBuffer_t static_stream;
+        uint8_t buf[configMINIMAL_STACK_SIZE];
+    } rx;
 
-    SemaphoreHandle_t tx_hndl;
-    StaticSemaphore_t static_tx_semphr;
+    struct {
+        SemaphoreHandle_t semphr_hndl;
+        StaticSemaphore_t static_semphr;
+        StreamBufferHandle_t *pBuf_hndl;
+    } tx;
 
     // CRSF Packets
     struct crsf_packets {
@@ -67,14 +70,25 @@ typedef struct CRSF {
     eCRSFError state;
 } CRSF_t;
 
-extern eCRSFError crsf_init(CRSF_t* pHndl,
-                            Serial_t* pSerial,
-                            pin_t srx,
-                            pin_t stx);
-extern eCRSFError crsf_write_rc(CRSF_t* pHndl, crsf_rc_t* pChannels);
-extern eCRSFError crsf_read_gps(CRSF_t* pHndl, crsf_gps_t* pGPS);
-extern eCRSFError crsf_read_battery(CRSF_t* pHndl, crsf_battery_t* pBattery);
-extern eCRSFError crsf_read_attitude(CRSF_t* pHndl, crsf_attitude_t* pAttitude);
-extern eCRSFError crsf_read_mode(CRSF_t* pHndl, crsf_fcmode_t* pMode);
+/**
+ * @brief Initialize a CRSF Interface
+ *
+ * @param pHndl Blank handle to Initialize
+ * @param pTx_hndl Transmit Stream Buffer (to send crsf packets to)
+ * @return pRx_hndl - buffer the CRSF interface reads from
+ */
+extern StreamBufferHandle_t *crsf_init(CRSF_t *pHndl,
+                                       StreamBufferHandle_t *pTx_hndl);
+
+extern eCRSFError crsf_write_rc(CRSF_t *pHndl, crsf_rc_t *pChannels);
+extern eCRSFError crsf_write_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);
+extern eCRSFError crsf_write_attitude(CRSF_t *pHndl,
+                                      crsf_attitude_t *pAttitude);
+extern eCRSFError crsf_write_mode(CRSF_t *pHndl, crsf_fcmode_t *pMode);
+
+extern eCRSFError crsf_read_rc(CRSF_t *pHndl, crsf_rc_t *pChannels);
+extern eCRSFError crsf_read_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);
+extern eCRSFError crsf_read_attitude(CRSF_t *pHndl, crsf_attitude_t *pAttitude);
+extern eCRSFError crsf_read_mode(CRSF_t *pHndl, crsf_fcmode_t *pMode);
 
 #endif

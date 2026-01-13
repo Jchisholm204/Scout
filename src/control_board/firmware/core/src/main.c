@@ -30,7 +30,11 @@
 #include "usb/usb_interface.h"
 
 // Task Includes
+#include "tasks/ctrl_tsk.h"
 #include "tasks/test_tsks.h"
+
+// Task Structures
+struct ctrl_tsk ctrl_tsk;
 
 // Initialize all system Interfaces
 void Init(void) {
@@ -45,7 +49,9 @@ void Init(void) {
 
     // Initialize UART
     Serial_t *Serial3 =
-        serial_init(eSerial3, /*baud*/ 9600, PIN_USART3_RX, PIN_USART3_TX);
+        serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);
+    Serial_t *Serial2 =
+        serial_init(eSerial2, /*baud*/ CRSF_BAUD, PIN_USART2_RX, PIN_USART2_TX);
 
     // Register Serial Port 3 as STDIO
     // (Use this serial port for printf)
@@ -57,6 +63,7 @@ void Init(void) {
      * Tasks can be initialized dynamically, but may crash the system if they
      * overflow the system memory (128Kb for the STM32f446)
      */
+    ctrl_tsk_init(&ctrl_tsk, Serial2);
     // crsf_init(&tsk_crsf, &Serial2, PIN_USART2_RX, PIN_USART2_TX);
     xTaskCreate(
         vTsk_testOnline, "test", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
