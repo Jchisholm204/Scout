@@ -48,9 +48,9 @@ static StaticQueue_t usbi_lidar_tx_vertical_sqh = {0};
 static struct udev_pkt_lidar usbi_lidar_tx_vertical_buf[USBI_LIDAR_BUF_SIZE] = {
     0};
 static StaticQueue_t usbi_ctrl_tx_sqh = {0};
-static struct udev_pkt_lidar usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
+static struct udev_pkt_ctrl_tx usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
 static StaticQueue_t usbi_ctrl_rx_sqh = {0};
-static struct udev_pkt_lidar usbi_ctrl_rx_buf[USBI_CTRL_BUF_SIZE] = {0};
+static struct udev_pkt_ctrl_rx usbi_ctrl_rx_buf[USBI_CTRL_BUF_SIZE] = {0};
 
 struct usbi *usbi_init(void) {
     // Initialize the USB Device
@@ -74,40 +74,38 @@ struct usbi *usbi_init(void) {
     // External Interface Setup
 
     usbi.lidar_rx_front =
-        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
                            sizeof(struct udev_pkt_lidar),
                            (uint8_t *) usbi_lidar_rx_front_buf,
                            &usbi_lidar_rx_front_sqh);
 
     usbi.lidar_rx_vertical =
-        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
                            sizeof(struct udev_pkt_lidar),
                            (uint8_t *) usbi_lidar_rx_vertical_buf,
                            &usbi_lidar_rx_vertical_sqh);
 
     usbi.lidar_tx_front =
-        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
                            sizeof(struct udev_pkt_lidar),
                            (uint8_t *) usbi_lidar_tx_front_buf,
                            &usbi_lidar_tx_front_sqh);
 
     usbi.lidar_rx_vertical =
-        xQueueCreateStatic(sizeof(struct udev_pkt_lidar) * USBI_LIDAR_BUF_SIZE,
+        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
                            sizeof(struct udev_pkt_lidar),
                            (uint8_t *) usbi_lidar_tx_vertical_buf,
                            &usbi_lidar_tx_vertical_sqh);
 
-    usbi.ctrl_tx =
-        xQueueCreateStatic(sizeof(struct udev_pkt_ctrl_tx) * USBI_CTRL_BUF_SIZE,
-                           sizeof(struct udev_pkt_ctrl_tx),
-                           (uint8_t *) usbi_ctrl_tx_buf,
-                           &usbi_ctrl_tx_sqh);
+    usbi.ctrl_tx = xQueueCreateStatic(USBI_CTRL_BUF_SIZE,
+                                      sizeof(struct udev_pkt_ctrl_tx),
+                                      (uint8_t *) usbi_ctrl_tx_buf,
+                                      &usbi_ctrl_tx_sqh);
 
-    usbi.ctrl_rx =
-        xQueueCreateStatic(sizeof(struct udev_pkt_ctrl_rx) * USBI_CTRL_BUF_SIZE,
-                           sizeof(struct udev_pkt_ctrl_rx),
-                           (uint8_t *) usbi_ctrl_rx_buf,
-                           &usbi_ctrl_rx_sqh);
+    usbi.ctrl_rx = xQueueCreateStatic(USBI_CTRL_BUF_SIZE,
+                                      sizeof(struct udev_pkt_ctrl_rx),
+                                      (uint8_t *) usbi_ctrl_rx_buf,
+                                      &usbi_ctrl_rx_sqh);
 
     return &usbi;
 }
@@ -123,19 +121,17 @@ static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
         xQueueOverwriteFromISR(usbi.ctrl_tx, &pkt_ctrl_tx, &higher_woken);
     } else {
         struct udev_pkt_ctrl_rx pkt_ctrl_rx = {0};
+        // char ar[] = "Hello1\nHello2\nHello3\nHello4\n";
         if (xQueueReceiveFromISR(usbi.ctrl_rx, &pkt_ctrl_rx, &higher_woken) ==
             pdTRUE) {
-            usbd_ep_write(dev,
-                          ep,
-                          (void *) &pkt_ctrl_rx,
-                          sizeof(struct udev_pkt_ctrl_rx));
+            usbd_ep_write(
+                dev, ep, (void *) &pkt_ctrl_rx, sizeof(struct udev_pkt_ctrl_rx));
         } else {
-            usbd_ep_write(dev, ep, (void *) 0, 0);
+            usbd_ep_write(dev, ep, (void *) &pkt_ctrl_rx, 0);
         }
     }
     portYIELD_FROM_ISR(higher_woken);
 }
-
 static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     BaseType_t higher_woken = pdFALSE;
     struct udev_pkt_lidar pkt_lidar = {0};

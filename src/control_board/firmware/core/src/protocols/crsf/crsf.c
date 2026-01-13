@@ -83,13 +83,13 @@ void vCRSF_Hndl_tsk(void *pvParams) {
         // First byte failed to be the ID byte
         if (rx_idx == 1 && new_byte != CRSF_ADDR) {
             rx_idx = 0;
-            // printf("RXADDRF\n");
+            pHndl->state = eCRSFAddrMisMatch;
             continue;
         }
         // Check that the length is not invalid
         if (rx_idx == 2 && (new_byte < 2 || new_byte > CRSF_DATA_MAXLEN)) {
             rx_idx = 0;
-            // printf("RXLENF\n");
+            pHndl->state = eCRSFPktOverLen;
             continue;
         }
 

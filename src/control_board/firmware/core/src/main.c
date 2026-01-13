@@ -63,10 +63,10 @@ void Init(void) {
      * Tasks can be initialized dynamically, but may crash the system if they
      * overflow the system memory (128Kb for the STM32f446)
      */
-    ctrl_tsk_init(&ctrl_tsk, Serial2);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx);
     // crsf_init(&tsk_crsf, &Serial2, PIN_USART2_RX, PIN_USART2_TX);
     xTaskCreate(
-        vTsk_testOnline, "test", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+        vTsk_testOnline, "test", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
 
     return;
 }

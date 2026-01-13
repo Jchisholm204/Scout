@@ -15,6 +15,7 @@
 #include "config/sys_cfg.h"
 #include "drivers/serial.h"
 #include "semphr.h"
+#include "queue.h"
 #include "stream_buffer.h"
 #include "protocols/crsf/crsf.h"
 
@@ -33,8 +34,11 @@ struct ctrl_tsk {
     StreamBufferHandle_t tx_hndl;
     StaticStreamBuffer_t tx_streamBuf;
     uint8_t tx_buf[configMINIMAL_STACK_SIZE];
+
+    QueueHandle_t ctrl_tx;
+    QueueHandle_t ctrl_rx;
 };
 
-extern int ctrl_tsk_init(struct ctrl_tsk *pHndl, Serial_t *pSerial);
+extern int ctrl_tsk_init(struct ctrl_tsk *pHndl, Serial_t *pSerial, QueueHandle_t ctrl_rx, QueueHandle_t ctrl_tx);
 
 #endif
