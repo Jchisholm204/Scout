@@ -42,27 +42,27 @@ class Driver : public rclcpp::Node {
 
     // LiDAR EP Callbacks
     // Output for running in regular mode
-    // rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_front_pub;
-    // rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_vertical_pub;
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_front_pub;
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr _ls_vertical_pub;
     // Input for running in simulation mode
-    // rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _ls_front_sub;
-    // rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _ls_vertical_sub;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _ls_front_sub;
+    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _ls_vertical_sub;
     void _ls_front_callback(const sensor_msgs::msg::LaserScan& ls);
     void _ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls);
     // EP read callback
-    // rclcpp::TimerBase::SharedPtr _lidar_timer;
+    rclcpp::TimerBase::SharedPtr _lidar_timer;
     void _lidar_callback(void);
 
     // Control EP Callbacks
-    // rclcpp::Publisher<geometry_msgs::msg::Quaternion> _vel_cmd_pub;
-    // rclcpp::Publisher<sensor_msgs::msg::BatteryState> _battery_pub;
-    // rclcpp::Publisher<std_msgs::msg::UInt8> _mode_pub;
-    // rclcpp::Publisher<std_msgs::msg::UInt8> _status_pub;
+    rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _vel_cmd_pub;
+    rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr _battery_pub;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr _mode_pub;
+    rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr _status_pub;
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
     void _ctrl_callback(void);
 
     // rclcpp::Subscription<std_msgs::msg::UInt8> _mode_sub;
-    void _mode_callback(std_msgs::msg::UInt8& qt);
+    void _mode_callback(std_msgs::msg::UInt8& new_mode);
     // rclcpp::Subscription<geometry_msgs::msg::Quaternion> _vel_cmd_sub;
     void _vel_callback(const geometry_msgs::msg::Quaternion& qt);
 };

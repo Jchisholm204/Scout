@@ -13,6 +13,13 @@
 
 Driver::Driver() : Node("cb_driver") {
 
+    this->declare_parameter("publish_base", "cb");
+    std::string pub_base = this->get_parameter("publish_base").as_string();
+    this->declare_parameter("ctrl_rate", 50);
+    int ctrl_rate = this->get_parameter("ctrl_rate").as_int();
+    this->declare_parameter("lidar_rate", 50);
+    int lidar_rate = this->get_parameter("lidar_rate").as_int();
+
     // Begin Libusb Initialization
     this->_lusb_ctx = NULL;
     this->_lusb_hndl = NULL;
@@ -34,8 +41,38 @@ Driver::Driver() : Node("cb_driver") {
     }
     // END Libusb Initialization
 
-    _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(50),
+    // BEGIN Lidar Interfaces
+    _ls_front_pub =
+        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/out/ls_front",
+                                                            10);
+    _ls_vertical_pub =
+        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/out/ls_vertical",
+                                                            10);
+    _ls_front_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        pub_base + "/in/ls_front", 10,
+        std::bind(&Driver::_ls_front_callback, this, std::placeholders::_1));
+    _ls_vertical_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
+        pub_base + "/in/ls_vertical", 10,
+        std::bind(&Driver::_ls_vertical_callback, this, std::placeholders::_1));
+
+    _lidar_timer = this->create_wall_timer(std::chrono::milliseconds(lidar_rate),
+                                           std::bind(&Driver::_lidar_callback, this));
+
+    // END Lidar Interfaces
+
+    // BEGIN Control Interfaces
+    _vel_cmd_pub =
+        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/out/vel", 10);
+    _battery_pub =
+        this->create_publisher<sensor_msgs::msg::BatteryState>(pub_base + "/out/battery",
+                                                               10);
+    _mode_pub = this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/out/mode", 10);
+    _status_pub =
+        this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/out/status", 10);
+
+    _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(ctrl_rate),
                                           std::bind(&Driver::_ctrl_callback, this));
+    // END Control Interfaces
 }
 
 Driver::~Driver() {
@@ -45,21 +82,6 @@ Driver::~Driver() {
     libusb_exit(_lusb_ctx);
 }
 
-int Driver::_usb_send_ls(const enum eCBLidar lid, const sensor_msgs::msg::LaserScan& ls) {
-}
-int Driver::_usb_recv_ls(struct udev_pkt_lidar& pkt_ldr) {
-}
-int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMode mode) {
-}
-int Driver::_usb_recv_ctrl(struct udev_pkt_ctrl_rx& pkt) {
-    int transfered = 0;
-    _lusb_err = libusb_bulk_transfer(_lusb_hndl, CTRL_TXD_EP, (uint8_t*) &pkt,
-                                     sizeof(struct udev_pkt_ctrl_rx), &transfered, 0);
-    if (_lusb_err != 0) {
-        return 0;
-    }
-    return transfered;
-}
 int Driver::_usb_connected(void) {
     libusb_device** devices;
     ssize_t count;
@@ -96,6 +118,7 @@ int Driver::_usb_connected(void) {
 
     return found; // 1 if device is connected, 0 otherwise
 }
+
 int Driver::_usb_reconnect(void) {
     _lusb_hndl = libusb_open_device_with_vid_pid(_lusb_ctx, VENDOR_ID, DEVICE_ID);
     if (!_lusb_hndl) {
@@ -137,28 +160,4 @@ int Driver::_usb_reconnect(void) {
         return _lusb_err;
     }
     return 0;
-}
-
-void Driver::_ls_front_callback(const sensor_msgs::msg::LaserScan& ls) {
-}
-void Driver::_ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls) {
-}
-void Driver::_lidar_callback(void) {
-}
-void Driver::_ctrl_callback(void) {
-    if (!_usb_connected()) {
-        if (_usb_reconnect()) {
-            RCLCPP_ERROR(this->get_logger(), "USB Reconnect Failed");
-            return;
-        }
-    }
-    struct udev_pkt_ctrl_rx pkt_rx;
-    _usb_recv_ctrl(pkt_rx);
-    RCLCPP_INFO(this->get_logger(), "USB OK");
-    RCLCPP_INFO(this->get_logger(), "%1.3f %1.3f %1.3f %1.3f", pkt_rx.vel.x, pkt_rx.vel.y,
-                pkt_rx.vel.z, pkt_rx.vel.w);
-}
-void Driver::_mode_callback(std_msgs::msg::UInt8& qt) {
-}
-void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
 }

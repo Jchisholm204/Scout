@@ -24,6 +24,8 @@
 #include <assert.h>
 #include <stdint.h>
 
+#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 2) / 2)
+
 struct udev_pkt_ctrl_tx {
     union {
         struct {
@@ -51,13 +53,10 @@ struct udev_pkt_lidar {
     struct {
         uint8_t id : 1;
         uint8_t sequence : 7;
+        uint8_t len;
     } __attribute__((packed)) hdr;
-    struct {
-        // angle = angle / 64.0
-        uint16_t angle;
-        // distance (mm) = distance / 4.0
-        uint16_t distance;
-    } data[15];
+    // distance (mm) = distance / 4.0
+    uint16_t distances[UDEV_LIDAR_POINTS];
 } __attribute__((packed));
 
 // USB Packets must be less than 0x40/64 bytes in length
