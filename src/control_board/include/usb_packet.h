@@ -24,8 +24,8 @@
 #include <assert.h>
 #include <stdint.h>
 
-#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 4) / 2)
-#define UDEV_SEQ_MAX (180/UDEV_LIDAR_POINTS)
+#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 8) / 2)
+#define UDEV_SEQ_MAX (180 + (UDEV_LIDAR_POINTS - 1) / UDEV_LIDAR_POINTS)
 
 struct udev_pkt_ctrl_tx {
     union {
@@ -35,7 +35,7 @@ struct udev_pkt_ctrl_tx {
         float data[4];
     } vel;
     uint8_t mode;
-} __attribute__((packed));
+} __attribute__((packed, aligned(4)));
 
 struct udev_pkt_ctrl_rx {
     union {
@@ -48,7 +48,7 @@ struct udev_pkt_ctrl_rx {
     uint8_t rssi;
     uint8_t status;
     uint8_t mode;
-} __attribute__((packed));
+} __attribute__((packed, aligned(4)));
 
 struct udev_pkt_lidar {
     struct {
@@ -57,15 +57,15 @@ struct udev_pkt_lidar {
         uint8_t len;
     } __attribute__((packed)) hdr;
     // distance (mm) = distance / 4.0
-    uint16_t distances[UDEV_LIDAR_POINTS];
-} __attribute__((packed));
+    uint16_t distances[20];
+} __attribute__((aligned(4)));
 
 // USB Packets must be less than 0x40/64 bytes in length
 static_assert(sizeof(struct udev_pkt_ctrl_tx) <= CTRL_DATA_SZ,
               "USBD Control Packet Oversize");
 static_assert(sizeof(struct udev_pkt_ctrl_rx) <= CTRL_DATA_SZ,
               "USBD Control Packet Oversize");
-static_assert(sizeof(struct udev_pkt_lidar) <= CTRL_DATA_SZ,
+static_assert(sizeof(struct udev_pkt_lidar) <= LIDAR_DATA_SZ,
               "USBD Status Packet Oversize");
 
 #endif

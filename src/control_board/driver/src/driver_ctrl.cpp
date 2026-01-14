@@ -20,7 +20,7 @@ int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMod
     pkt.mode = mode;
     int transfered = 0;
     _lusb_err = libusb_bulk_transfer(_lusb_hndl, CTRL_RXD_EP, (uint8_t*) &pkt,
-                                     sizeof(struct udev_pkt_lidar), &transfered, 0);
+                                     sizeof(struct udev_pkt_ctrl_tx), &transfered, 0);
     if (_lusb_err != 0) {
         return 0;
     }

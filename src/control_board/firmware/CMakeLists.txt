@@ -95,6 +95,7 @@ target_compile_options(${EXECUTABLE} PRIVATE
     -ffunction-sections
     -fdata-sections
     --specs=nano.specs
+    -O0
     #$<$<CONFIG:Debug>:-Os -g3>
     #$<$<CONFIG:Release>:-Os -g0>
     )

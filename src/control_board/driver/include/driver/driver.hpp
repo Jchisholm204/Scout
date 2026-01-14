@@ -33,7 +33,7 @@ class Driver : public rclcpp::Node {
     libusb_context* _lusb_ctx = NULL;
     libusb_device_handle* _lusb_hndl;
     int _lusb_err;
-    int _usb_send_ls(const enum eCBLidar lid, const sensor_msgs::msg::LaserScan& ls);
+    int _usb_send_ls(struct udev_pkt_lidar& pkt_ldr);
     int _usb_recv_ls(struct udev_pkt_lidar& pkt_ldr);
     int _usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMode mode);
     int _usb_recv_ctrl(struct udev_pkt_ctrl_rx& pkt);

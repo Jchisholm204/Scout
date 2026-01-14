@@ -27,24 +27,24 @@
 #include <stdio.h>
 
 // USB Device
-static usbd_device udev;
-static uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
+usbd_device udev;
+uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
 // Lidar Data transmission interleaving
-static volatile enum eCBLidar lidar_primary_rx = eLidarFront;
+volatile enum eCBLidar lidar_primary_rx = eLidarFront;
 
 // USBD Configuration Callback
 static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg);
 
 // External Interfacing
-static struct usbi usbi;
-static StaticQueue_t usbi_lidar_rx_sqh;
-static struct udev_pkt_lidar usbi_lidar_rx_buf[USBI_LIDAR_BUF_SIZE] = {0};
-static StaticQueue_t usbi_lidar_tx_sqh = {0};
-static struct udev_pkt_lidar usbi_lidar_tx_buf[USBI_LIDAR_BUF_SIZE] = {0};
-static StaticQueue_t usbi_ctrl_tx_sqh = {0};
-static struct udev_pkt_ctrl_tx usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
-static StaticQueue_t usbi_ctrl_rx_sqh = {0};
-static struct udev_pkt_ctrl_rx usbi_ctrl_rx_buf[USBI_CTRL_BUF_SIZE] = {0};
+struct usbi usbi = {0};
+StaticQueue_t usbi_lidar_rx_sqh;
+struct udev_pkt_lidar usbi_lidar_rx_buf[USBI_LIDAR_BUF_SIZE] = {0};
+StaticQueue_t usbi_lidar_tx_sqh = {0};
+struct udev_pkt_lidar usbi_lidar_tx_buf[USBI_LIDAR_BUF_SIZE] = {0};
+StaticQueue_t usbi_ctrl_tx_sqh = {0};
+struct udev_pkt_ctrl_tx usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
+StaticQueue_t usbi_ctrl_rx_sqh = {0};
+struct udev_pkt_ctrl_rx usbi_ctrl_rx_buf[USBI_CTRL_BUF_SIZE] = {0};
 
 struct usbi *usbi_init(void) {
     // Initialize the USB Device
@@ -57,13 +57,6 @@ struct usbi *usbi_init(void) {
     // Apply the USBD Descriptors
     usbd_reg_control(&udev, udev_control);
     usbd_reg_descr(&udev, udev_getdesc);
-
-    // Enable USB OTG Interrupt
-    NVIC_SetPriority(OTG_FS_IRQn, NVIC_Priority_MIN);
-    NVIC_EnableIRQ(OTG_FS_IRQn);
-    // Enable the USB Device
-    usbd_enable(&udev, 1);
-    usbd_connect(&udev, 1);
 
     // External Interface Setup
 
@@ -87,18 +80,32 @@ struct usbi *usbi_init(void) {
                                       (uint8_t *) usbi_ctrl_rx_buf,
                                       &usbi_ctrl_rx_sqh);
 
+    // Enable USB OTG Interrupt
+    NVIC_SetPriority(OTG_FS_IRQn, 8);
+    NVIC_EnableIRQ(OTG_FS_IRQn);
+    // Enable the USB Device
+    usbd_enable(&udev, 1);
+    usbd_connect(&udev, 1);
+
     return &usbi;
 }
 
+volatile int queue_fails = 0;
 // USBD RX/TX Callbacks: Control COM Port
 // Triggered during Virtual Communications Interface events
 static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     BaseType_t higher_woken = pdFALSE;
     if (evt == usbd_evt_eprx) {
         struct udev_pkt_ctrl_tx pkt_ctrl_tx = {0};
-        usbd_ep_read(
+        int len = usbd_ep_read(
             dev, ep, (void *) &pkt_ctrl_tx, sizeof(struct udev_pkt_ctrl_tx));
-        xQueueOverwriteFromISR(usbi.ctrl_tx, &pkt_ctrl_tx, &higher_woken);
+        if (!usbi.lidar_rx)
+            return;
+        BaseType_t r =
+            xQueueOverwriteFromISR(usbi.ctrl_tx, &pkt_ctrl_tx, &higher_woken);
+        if (r != pdTRUE) {
+            queue_fails++;
+        }
     } else {
         struct udev_pkt_ctrl_rx pkt_ctrl_rx = {0};
         // char ar[] = "Hello1\nHello2\nHello3\nHello4\n";
@@ -114,17 +121,16 @@ static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     }
     portYIELD_FROM_ISR(higher_woken);
 }
-struct udev_pkt_lidar ldrpkt;
+static volatile struct udev_pkt_lidar pkt_lidar __attribute__((aligned)) = {0};
 static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     BaseType_t higher_woken = pdFALSE;
-    struct udev_pkt_lidar pkt_lidar = {0};
     if (evt == usbd_evt_eprx) {
         usbd_ep_read(
             dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));
-        if (xQueueSendFromISR(usbi.lidar_rx, &pkt_lidar, &higher_woken) ==
-            errQUEUE_FULL) {
-            // Handle the failure
-        }
+        // Dont worry about dropping packets
+        (void) xQueueSendToBackFromISR(usbi.lidar_rx,
+                                       &pkt_lidar,
+                                       &higher_woken);
     } else {
         if (xQueueReceiveFromISR(usbi.lidar_tx, &pkt_lidar, &higher_woken) ==
             pdTRUE) {

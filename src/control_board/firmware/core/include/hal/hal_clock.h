@@ -18,7 +18,7 @@
  *  crystal oscillator. Our FSAE boards use an 8Mhz crystal. Therefore make sure to use the correct clock
  *  in your design.
  * 
- *      SYS_FREQUENCY  = 180Mhz
+ *      SYS_FREQUENCY  = 168Mhz
  *      APB2_FREQUENCY = 45Mhz
  *      APB1_FREQUENCY = 36Mhz
  * 

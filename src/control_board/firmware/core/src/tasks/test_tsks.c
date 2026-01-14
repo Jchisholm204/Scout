@@ -25,6 +25,7 @@
 #include "drivers/canbus.h"
 #include "os/systime.h"
 
+extern int queue_fails;
 void vTsk_testOnline(void * pvParams){
     (void)pvParams;
     char* str = "Hello World from Serial 2\n";
@@ -42,6 +43,7 @@ void vTsk_testOnline(void * pvParams){
         struct systime t;
         systime_fromTicks(xTaskGetTickCount(), &t);
         printf("Time: %s\n", t.str);
+        printf("Queue Fails: %d\n", queue_fails);
         vTaskDelay(1000);
     }
 }

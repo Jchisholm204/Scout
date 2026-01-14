@@ -52,11 +52,16 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
 void vGPlanTsk(void *pvParams) {
     struct gplan_tsk *pHndl = (struct gplan_tsk *) pvParams;
 
+    printf("Gplan Online\n");
+
     for (;;) {
-        struct udev_pkt_lidar ldrpkt = {0};
-        sniprintf((char *) &ldrpkt, sizeof(ldrpkt), "HelloFromGPlan\0");
-        printf((const char *) &ldrpkt);
-        xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
-        vTaskDelay(100);
+        static struct udev_pkt_lidar ldrpkt = {0};
+        char msg[] = "Hello\n\0";
+        *(uint32_t *) &ldrpkt = *(uint32_t *) msg;
+        *((uint32_t *) (&ldrpkt) + 1) = *((uint32_t *) msg + 1);
+        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) == pdTRUE) {
+            xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
+        }
+        vTaskDelay(5);
     }
 }

@@ -11,31 +11,14 @@
 
 #include "driver/driver.hpp"
 
-int Driver::_usb_send_ls(const enum eCBLidar lid, const sensor_msgs::msg::LaserScan& ls) {
+int Driver::_usb_send_ls(struct udev_pkt_lidar& pkt_ldr) {
     if (!_lusb_hndl) {
         return _lusb_err;
     }
-    struct udev_pkt_lidar pkt;
-    pkt.hdr.id = (uint8_t) lid;
-    pkt.hdr.sequence = 0;
-    pkt.hdr.len = 0;
-    for (size_t i = 0; i < ls.ranges.size(); i++) {
-        pkt.distances[pkt.hdr.len++] = (uint16_t) (ls.ranges[i] * 4.0f);
-        // Lidar Packet points reached
-        if (pkt.hdr.len == UDEV_LIDAR_POINTS) {
-
-            int transfered = 0;
-            _lusb_err =
-                libusb_bulk_transfer(_lusb_hndl, LIDAR_RXD_EP, (uint8_t*) &pkt,
-                                     sizeof(struct udev_pkt_lidar), &transfered, 0);
-            pkt.hdr.sequence++;
-            pkt.hdr.len = 0;
-        }
-    }
     // Send remaining data
     int transfered = 0;
-    _lusb_err = libusb_bulk_transfer(_lusb_hndl, LIDAR_RXD_EP, (uint8_t*) &pkt,
-                                     sizeof(struct udev_pkt_lidar), &transfered, 0);
+    _lusb_err = libusb_bulk_transfer(_lusb_hndl, LIDAR_RXD_EP, (uint8_t*) &pkt_ldr,
+                                     sizeof(struct udev_pkt_lidar), &transfered, 1);
     return _lusb_err;
 }
 
@@ -45,7 +28,7 @@ int Driver::_usb_recv_ls(struct udev_pkt_lidar& pkt_ldr) {
     }
     int transfered = 0;
     _lusb_err = libusb_bulk_transfer(_lusb_hndl, LIDAR_TXD_EP, (uint8_t*) &pkt_ldr,
-                                     sizeof(struct udev_pkt_lidar), &transfered, 0);
+                                     sizeof(struct udev_pkt_lidar), &transfered, 1);
     if (_lusb_err != 0) {
         return 0;
     }
@@ -54,32 +37,22 @@ int Driver::_usb_recv_ls(struct udev_pkt_lidar& pkt_ldr) {
 
 void Driver::_ls_front_callback(const sensor_msgs::msg::LaserScan& ls) {
     // _usb_send_ls(eLidarFront, ls);
-
-    char str[] = "Hello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\n"
-                 "Hello\nHello\n"
-                 "Hello\nHello\n";
-    int transfered = 0;
-    if (!_lusb_hndl) {
-        return;
-    }
-    _lusb_err = libusb_bulk_transfer(_lusb_hndl, LIDAR_RXD_EP, (uint8_t*) str,
-                                     sizeof(struct udev_pkt_lidar), &transfered, 0);
 }
 
 void Driver::_ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls) {
     // _usb_send_ls(eLidarVertical, ls);
 }
 
-int k = 0;
+int k = 1;
 ;
 void Driver::_lidar_callback(void) {
-    if (!_usb_connected() || !_lusb_hndl) {
-        RCLCPP_ERROR(this->get_logger(), "USB Not Connected");
-        if (_usb_reconnect()) {
-            RCLCPP_ERROR(this->get_logger(), "USB Reconnect Failed");
-            return;
-        }
-    }
+    char str[] = "Hello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\nHello\n"
+                 "Hello\nHello\n"
+                 "Hello\nHello\n";
+    int transfered = 0;
+    udev_pkt_lidar pkt_tx;
+    memcpy(&pkt_tx, str, sizeof(struct udev_pkt_lidar));
+    _usb_send_ls(pkt_tx);
     udev_pkt_lidar pkt;
     if (_usb_recv_ls(pkt) != sizeof(struct udev_pkt_lidar)) {
         if (k) {
