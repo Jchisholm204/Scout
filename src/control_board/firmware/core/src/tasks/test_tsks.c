@@ -25,25 +25,24 @@
 #include "drivers/canbus.h"
 #include "os/systime.h"
 
-extern int queue_fails;
+
+static char pcwritebuf[0xFFF];
 void vTsk_testOnline(void * pvParams){
     (void)pvParams;
-    char* str = "Hello World from Serial 2\n";
+    // char* str = "Hello World from Serial 2\n";
     gpio_set_mode(PIN_LED1, GPIO_MODE_OUTPUT);
     gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
     gpio_set_mode(PIN_LED3, GPIO_MODE_OUTPUT);
     uint8_t leds = 1U;
-    // hal_can_init(CAN1, CAN_1000KBPS, true, PIN_CAN1_TX, PIN_CAN1_RX);
-    // RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    vTaskDelay(100);
+    vTaskDelay(1000);
     for(;;){
+        vTaskGetRunTimeStats(pcwritebuf);
         leds ^= 0x3U;
         gpio_write(PIN_LED1, leds & 0x1U);
         gpio_write(PIN_LED2, leds & 0x2U);
         struct systime t;
         systime_fromTicks(xTaskGetTickCount(), &t);
         printf("Time: %s\n", t.str);
-        printf("Queue Fails: %d\n", queue_fails);
         vTaskDelay(1000);
     }
 }

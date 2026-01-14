@@ -33,6 +33,10 @@
 #ifndef FREERTOS_CONFIG_H
 #define FREERTOS_CONFIG_H
 
+void RuntimeStatsTimer_Init(void);
+
+uint32_t ulGetRunTimeCounterValue(void);
+
 /*-----------------------------------------------------------
  * Application specific definitions.
  *
@@ -73,10 +77,11 @@
 #define configMAX_TASK_NAME_LEN                  ( 16 )
 #define configUSE_16_BIT_TICKS                   0
 #define configUSE_MUTEXES                        1
-#define configQUEUE_REGISTRY_SIZE                8
+#define configQUEUE_REGISTRY_SIZE                10
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION  1
 #define configUSE_TRACE_FACILITY                 1 // Enable trace facility
 #define configGENERATE_RUN_TIME_STATS            1 // Enable runtime stats
+#define configUSE_STATS_FORMATTING_FUNCTIONS     1
 #define configUSE_TASK_FPU_SUPPORT               1 // Enable context switching for floating points
 #define configRECORD_STACK_HIGH_ADDRESS          1
 /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
@@ -98,7 +103,9 @@ to exclude the API function. */
 #define INCLUDE_vTaskSuspend                 1
 #define INCLUDE_vTaskDelay                   1
 #define INCLUDE_xTaskGetSchedulerState       1
-
+#define INCLUDE_uxTaskGetSystemState         1
+#define INCLUDE_uxTaskGetStackHighWaterMark  1
+#define INCLUDE_vTaskGetInfo                 1
 #define INCLUDE_xTaskDelayUntil              1
 
 /* Cortex-M specific definitions. */
@@ -147,8 +154,11 @@ standard names. */
 
 #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()  /* No-op since SysTick is already configured */
 // #define portGET_RUN_TIME_COUNTER_VALUE() (SysTick->LOAD - SysTick->VAL)
-#define portGET_RUN_TIME_COUNTER_VALUE() ((uint32_t)(SysTick->LOAD - SysTick->VAL) / (configCPU_CLOCK_HZ / configTICK_RATE_HZ))
+// #define portGET_RUN_TIME_COUNTER_VALUE() ((uint32_t)(SysTick->LOAD - SysTick->VAL) / (configCPU_CLOCK_HZ / configTICK_RATE_HZ))
+#define portGET_RUN_TIME_COUNTER_VALUE() xTaskGetTickCount()
 
+// #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() RuntimeStatsTimer_Init()
+// #define portGET_RUN_TIME_COUNTER_VALUE() ulGetRunTimeCounterValue()
 
 
 #endif /* FREERTOS_CONFIG_H */

@@ -46,9 +46,6 @@ void Init(void) {
     // Init USB Interface
     struct usbi *usbi = usbi_init();
 
-    // Verify system clock is stable after USB init
-    hal_clock_init();
-
     // Initialize UART
     Serial_t *Serial3 =
         serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);
@@ -69,48 +66,17 @@ void Init(void) {
         gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx);
     // crsf_init(&tsk_crsf, &Serial2, PIN_USART2_RX, PIN_USART2_TX);
-    xTaskCreate(
-        vTsk_testOnline, "test", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+    xTaskCreate(vTsk_testOnline, "test", 1024, NULL, 1, NULL);
 
     return;
 }
 
-void trace_setup(void) {
-    // 1. Ensure GPIOB Clock is enabled (for PB3/SWO)
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-
-    // 2. Configure PB3 for AF0 (SWO)
-    GPIOB->MODER &= ~(3U << (3 * 2));
-    GPIOB->MODER |= (2U << (3 * 2));     // Alternate Function
-    GPIOB->OSPEEDR |= (3U << (3 * 2));   // Very High Speed
-    GPIOB->AFR[0] &= ~(0xFU << (3 * 4)); // AF0
-
-    // 3. Unlock and Enable Debug/Trace
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-
-    // 4. Configure TPIU - Protocol: Async NRZ (UART)
-    TPI->SPPR = 0x00000002;
-
-    // 5. Calculate ACPR (Prescaler)
-    // 168,000,000 / 2,000,000 = 84. ACPR = 84 - 1 = 83.
-    TPI->ACPR = 83;
-
-    // 6. Disable Formatter (Required for many open-source decoders)
-    TPI->FFCR = 0x0;
-
-    // 7. ITM Setup
-    ITM->LAR = 0xC5ACCE55; // Unlock
-    ITM->TCR = ITM_TCR_ITMENA_Msk | ITM_TCR_SYNCENA_Msk;
-    ITM->TER = 0x1; // Enable Stimulus Port 0
-}
-
 int main(void) {
-
     // Call the init function
     Init();
 
-    hal_clock_init();
-    // trace_setup();
+    // Required ..?
+    NVIC_SetPriorityGrouping(3);
 
     // Start Scheduler: Runs tasks initialized above
     vTaskStartScheduler();

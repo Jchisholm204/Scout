@@ -20,7 +20,7 @@
 #pragma once
 
 // Highest Priority that can be given to an NVIC Interrupt
-#define NVIC_Priority_MAX 21
+#define NVIC_Priority_MAX 6
 // Lowest Priority that can be given to an NVIC Interrupt
-#define NVIC_Priority_MIN 79
+#define NVIC_Priority_MIN 14
 

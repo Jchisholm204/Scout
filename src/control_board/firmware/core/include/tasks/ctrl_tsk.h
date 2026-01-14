@@ -14,12 +14,14 @@
 #include "FreeRTOS.h"
 #include "config/sys_cfg.h"
 #include "drivers/serial.h"
-#include "semphr.h"
-#include "queue.h"
-#include "stream_buffer.h"
 #include "protocols/crsf/crsf.h"
+#include "queue.h"
+#include "semphr.h"
+#include "stream_buffer.h"
 
 #include <stdio.h>
+
+#define CTRL_TSK_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
 
 struct ctrl_tsk {
     Serial_t *pSerial;
@@ -28,7 +30,7 @@ struct ctrl_tsk {
     // Task information
     TaskHandle_t tsk_hndl;
     StaticTask_t tsk_buf;
-    StackType_t tsk_stack[configMINIMAL_STACK_SIZE];
+    StackType_t tsk_stack[CTRL_TSK_STACK_SIZE];
 
     // Recieve Buffer (from serial driver interrupt)
     StreamBufferHandle_t tx_hndl;
@@ -39,6 +41,9 @@ struct ctrl_tsk {
     QueueHandle_t ctrl_rx;
 };
 
-extern int ctrl_tsk_init(struct ctrl_tsk *pHndl, Serial_t *pSerial, QueueHandle_t ctrl_rx, QueueHandle_t ctrl_tx);
+extern int ctrl_tsk_init(struct ctrl_tsk *pHndl,
+                         Serial_t *pSerial,
+                         QueueHandle_t ctrl_rx,
+                         QueueHandle_t ctrl_tx);
 
 #endif

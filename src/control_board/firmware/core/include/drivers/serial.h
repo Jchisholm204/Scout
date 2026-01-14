@@ -50,7 +50,7 @@ typedef struct Serial {
     IRQn_Type IRQn;
     SemaphoreHandle_t tx_hndl;
     StaticSemaphore_t static_tx_semphr;
-    StreamBufferHandle_t *rx_buf;
+    StreamBufferHandle_t rx_buf;
     eSerialError state;
 } Serial_t;
 
@@ -91,7 +91,7 @@ extern eSerialError serial_write(Serial_t *pHndl,
  * @returns eSerialOK or Error
  */
 extern eSerialError serial_attach(Serial_t *pHndl,
-                                  StreamBufferHandle_t *buf_hndl);
+                                  StreamBufferHandle_t buf_hndl);
 
 /**
  * @brief detach an RX buffer to a Serial Interface

@@ -10,6 +10,7 @@
  */
 
 #include "tasks/gravity_planner_tsk.h"
+#include "FreeRTOS.h"
 
 void vGPlanTsk(void *pvParams);
 
@@ -36,9 +37,9 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
     // Setup the Gravity Planner Task
     pHndl->tsk.hndl = xTaskCreateStatic(vGPlanTsk,
                                         "gplan",
-                                        configMINIMAL_STACK_SIZE,
+                                        GPLAN_TSK_STACK_SIZE,
                                         pHndl,
-                                        3,
+                                        configMAX_PRIORITIES-4,
                                         pHndl->tsk.stack,
                                         &pHndl->tsk.static_tsk);
 
@@ -56,9 +57,6 @@ void vGPlanTsk(void *pvParams) {
 
     for (;;) {
         static struct udev_pkt_lidar ldrpkt = {0};
-        char msg[] = "Hello\n\0";
-        *(uint32_t *) &ldrpkt = *(uint32_t *) msg;
-        *((uint32_t *) (&ldrpkt) + 1) = *((uint32_t *) msg + 1);
         if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) == pdTRUE) {
             xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
         }

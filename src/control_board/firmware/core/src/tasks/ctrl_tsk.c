@@ -23,16 +23,16 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     pHndl->pSerial = pSerial;
     pHndl->tsk_hndl = xTaskCreateStatic(vCtrlTsk,
                                         "ctrl_tsk",
-                                        configMINIMAL_STACK_SIZE,
+                                        CTRL_TSK_STACK_SIZE,
                                         pHndl,
-                                        2,
+                                        configMAX_PRIORITIES-2,
                                         pHndl->tsk_stack,
                                         &pHndl->tsk_buf);
 
     pHndl->tx_hndl = xStreamBufferCreateStatic(
         configMINIMAL_STACK_SIZE, 1, pHndl->tx_buf, &pHndl->tx_streamBuf);
 
-    StreamBufferHandle_t *rx_hndl = crsf_init(&pHndl->crsf, &pHndl->tx_hndl);
+    StreamBufferHandle_t rx_hndl = crsf_init(&pHndl->crsf, pHndl->tx_hndl);
 
     if (!rx_hndl) {
         printf("CRSF INI Fail\n");
@@ -60,6 +60,8 @@ void vCtrlTsk(void *pvParams) {
     int transmissions = 0;
 
     for (;;) {
+        // UBaseType_t uxHighwater = uxTaskGetStackHighWaterMark(NULL);
+        // printf("CTRL Stack; %ld\n", uxHighwater);
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->crsf, &rc);
         // printf("%d: %d %d %d %d\n",

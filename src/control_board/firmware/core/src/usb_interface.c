@@ -14,23 +14,16 @@
 #include "FreeRTOS.h"
 #include "config/FreeRTOSConfig.h"
 #include "config/nvic.h"
-#include "config/pin_cfg.h"
 #include "drivers/stusb/usb.h"
 #include "hal/hal_usb.h"
-#include "os/systime.h"
 #include "stm32f446xx.h"
 #include "task.h"
 #include "usb/usb_desc.h"
-#include "usb_cb_defs.h"
 #include "usb_packet.h"
-
-#include <stdio.h>
 
 // USB Device
 usbd_device udev;
 uint32_t usb0_buf[CDC_EP0_SIZE]; // EP0 Buffer
-// Lidar Data transmission interleaving
-volatile enum eCBLidar lidar_primary_rx = eLidarFront;
 
 // USBD Configuration Callback
 static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg);
@@ -81,7 +74,7 @@ struct usbi *usbi_init(void) {
                                       &usbi_ctrl_rx_sqh);
 
     // Enable USB OTG Interrupt
-    NVIC_SetPriority(OTG_FS_IRQn, 8);
+    NVIC_SetPriority(OTG_FS_IRQn, NVIC_Priority_MAX);
     NVIC_EnableIRQ(OTG_FS_IRQn);
     // Enable the USB Device
     usbd_enable(&udev, 1);
@@ -90,25 +83,20 @@ struct usbi *usbi_init(void) {
     return &usbi;
 }
 
-volatile int queue_fails = 0;
 // USBD RX/TX Callbacks: Control COM Port
 // Triggered during Virtual Communications Interface events
 static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     BaseType_t higher_woken = pdFALSE;
     if (evt == usbd_evt_eprx) {
         struct udev_pkt_ctrl_tx pkt_ctrl_tx = {0};
-        int len = usbd_ep_read(
+        (void) usbd_ep_read(
             dev, ep, (void *) &pkt_ctrl_tx, sizeof(struct udev_pkt_ctrl_tx));
-        if (!usbi.lidar_rx)
-            return;
-        BaseType_t r =
-            xQueueOverwriteFromISR(usbi.ctrl_tx, &pkt_ctrl_tx, &higher_woken);
-        if (r != pdTRUE) {
-            queue_fails++;
-        }
+        (void) xQueueOverwriteFromISR(usbi.ctrl_tx,
+                                      &pkt_ctrl_tx,
+                                      &higher_woken);
+
     } else {
         struct udev_pkt_ctrl_rx pkt_ctrl_rx = {0};
-        // char ar[] = "Hello1\nHello2\nHello3\nHello4\n";
         if (xQueueReceiveFromISR(usbi.ctrl_rx, &pkt_ctrl_rx, &higher_woken) ==
             pdTRUE) {
             usbd_ep_write(dev,
@@ -121,9 +109,9 @@ static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     }
     portYIELD_FROM_ISR(higher_woken);
 }
-static volatile struct udev_pkt_lidar pkt_lidar __attribute__((aligned)) = {0};
 static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     BaseType_t higher_woken = pdFALSE;
+    struct udev_pkt_lidar pkt_lidar = {0};
     if (evt == usbd_evt_eprx) {
         usbd_ep_read(
             dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));

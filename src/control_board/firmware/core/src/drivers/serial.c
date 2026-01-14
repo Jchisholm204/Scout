@@ -13,7 +13,7 @@
 
 #include "config/nvic.h"
 
-Serial_t SerialPort[eSerialN] = {
+static Serial_t SerialPort[eSerialN] = {
     {USART1, USART1_IRQn, NULL, {0}, NULL, eSerialNoInit},
     {USART2, USART2_IRQn, NULL, {0}, NULL, eSerialNoInit},
     {USART3, USART3_IRQn, NULL, {0}, NULL, eSerialNoInit},
@@ -65,7 +65,7 @@ eSerialError serial_write(Serial_t *pHndl,
     return eSerialSemphr;
 }
 
-eSerialError serial_attach(Serial_t *pHndl, StreamBufferHandle_t *buf_hndl) {
+eSerialError serial_attach(Serial_t *pHndl, StreamBufferHandle_t buf_hndl) {
     if (pHndl == NULL || buf_hndl == NULL)
         return eSerialNULL;
     if (pHndl->state != eSerialOK)
@@ -92,6 +92,8 @@ eSerialError serial_detach(Serial_t *pHndl) {
 }
 
 void generic_handler(Serial_t *pHndl) {
+    // MUST read status to clear ORE/NF/FE flags
+    (void)hal_uart_read_status(pHndl->UART);
     // MUST read input port to clear iPending bit
     uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
     // hal_uart_write_byte(pHndl->UART, rx_data);
@@ -99,12 +101,13 @@ void generic_handler(Serial_t *pHndl) {
     if (pHndl->rx_buf == NULL || pHndl->state != eSerialOK) {
         // If there is no handler disable this interrupt
         hal_uart_enable_rxne(pHndl->UART, false);
+        NVIC_DisableIRQ(pHndl->IRQn);
         return;
     }
     // If a buffer exists, run the interrupt routine
     BaseType_t higher_woken = pdFALSE;
     xStreamBufferSendFromISR(
-        *pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
+        pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
     portYIELD_FROM_ISR(higher_woken);
 }
 

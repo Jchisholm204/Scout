@@ -64,3 +64,9 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
         // Halt the system or take appropriate actions
     }
 }
+
+void HardFault_Handler(void) {
+    // These will be visible in GDB
+    __asm volatile("bkpt #0");
+    while(1);
+}

@@ -23,13 +23,15 @@
 // Must be 1 to only hold most recent value
 #define GPLAN_CVTX_BUF_SIZE 1
 
+#define GPLAN_TSK_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
+
 struct gplan_tsk {
 
     // Task information
     struct {
         TaskHandle_t hndl;
         StaticTask_t static_tsk;
-        StackType_t stack[configMINIMAL_STACK_SIZE];
+        StackType_t stack[GPLAN_TSK_STACK_SIZE];
     } tsk;
 
     // Output Queue

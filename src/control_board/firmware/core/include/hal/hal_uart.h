@@ -69,6 +69,9 @@ static inline uint8_t hal_uart_read_byte(const USART_TypeDef *uart) {
     return ((uint8_t) (uart->DR & 255));
 }
 
+static inline uint32_t hal_uart_read_status(const USART_TypeDef *uart){
+    return ((uint32_t)uart->SR);
+}
 
 static inline void hal_uart_write_byte(USART_TypeDef * uart, uint8_t byte) {
     uart->DR = byte;

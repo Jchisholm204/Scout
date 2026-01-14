@@ -22,7 +22,7 @@
  */
 void SystemInit(void){
     // Enable system configuration register
-    RCC->AHB2ENR |= RCC_APB2ENR_SYSCFGEN;
+    RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     RCC->APB1ENR |= RCC_APB1ENR_PWREN;
     SET_BIT(PWR->CR, PWR_CR_VOS_Msk);
     // enable FPU
@@ -30,6 +30,7 @@ void SystemInit(void){
     // Initialize Clock
     hal_clock_init();
     // configure system tick (ARM)
-    SysTick_Config(SYS_FREQUENCY/1000); // DO NOT USE "SystemClock"
+    // Let FreeRTOS configure it on its own
+    // SysTick_Config(SYS_FREQUENCY/1000); // DO NOT USE "SystemClock"
 }
 

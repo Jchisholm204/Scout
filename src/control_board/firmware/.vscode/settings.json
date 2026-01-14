@@ -1,0 +1,8 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/usr/lib64/ros2-humble/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/usr/lib64/ros2-humble/lib/python3.12/site-packages"
+    ]
+}

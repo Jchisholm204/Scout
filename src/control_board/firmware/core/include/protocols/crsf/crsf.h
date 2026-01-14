@@ -19,8 +19,8 @@
 #include <stdio.h>
 
 #define CRSF_BAUD 420000
-#define CRSF_SERIAL_LOCK 0x1234
 #define CRSF_TIMEOUT_MS 100
+#define CRSF_STACK_SIZE (configMINIMAL_STACK_SIZE)
 
 typedef enum {
     eCRSFOK,
@@ -40,9 +40,9 @@ typedef enum {
 typedef struct CRSF {
     // Task information (Maybe not needed)
     struct {
+        StackType_t stack[CRSF_STACK_SIZE];
         TaskHandle_t hndl;
         StaticTask_t static_tsk;
-        StackType_t stack[configMINIMAL_STACK_SIZE];
     } tsk;
 
     // Recieve Buffer (from serial driver interrupt)
@@ -55,7 +55,7 @@ typedef struct CRSF {
     struct {
         SemaphoreHandle_t semphr_hndl;
         StaticSemaphore_t static_semphr;
-        StreamBufferHandle_t *pBuf_hndl;
+        StreamBufferHandle_t pBuf_hndl;
     } tx;
 
     // CRSF Packets
@@ -77,8 +77,8 @@ typedef struct CRSF {
  * @param pTx_hndl Transmit Stream Buffer (to send crsf packets to)
  * @return pRx_hndl - buffer the CRSF interface reads from
  */
-extern StreamBufferHandle_t *crsf_init(CRSF_t *pHndl,
-                                       StreamBufferHandle_t *pTx_hndl);
+extern StreamBufferHandle_t crsf_init(CRSF_t *pHndl,
+                                      StreamBufferHandle_t pTx_hndl);
 
 extern eCRSFError crsf_write_rc(CRSF_t *pHndl, crsf_rc_t *pChannels);
 extern eCRSFError crsf_write_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);

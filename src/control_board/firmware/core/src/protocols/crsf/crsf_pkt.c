@@ -37,7 +37,7 @@ eCRSFError _crsf_send_packet(CRSF_t *pHndl, _crsf_msg_t *msg, enum eCRSFMsgId id
     msg->pyld[len] = crc;
 
     if(xSemaphoreTake(pHndl->tx.semphr_hndl, 10) != pdTRUE){
-        xStreamBufferSend(*pHndl->tx.pBuf_hndl, msg, msg->length + 1, 10);
+        xStreamBufferSend(pHndl->tx.pBuf_hndl, msg, msg->length + 1, 10);
     }
 
     return eCRSFOK;

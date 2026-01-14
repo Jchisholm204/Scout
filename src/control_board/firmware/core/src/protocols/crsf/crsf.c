@@ -19,7 +19,7 @@
 void vCRSF_Hndl_tsk(void *pvParams);
 uint8_t _crsf_crc8(const uint8_t *ptr, uint8_t len);
 
-StreamBufferHandle_t *crsf_init(CRSF_t *pHndl, StreamBufferHandle_t *pTx_hndl) {
+StreamBufferHandle_t crsf_init(CRSF_t *pHndl, StreamBufferHandle_t pTx_hndl) {
     if (!pHndl)
         return NULL;
     if (!pTx_hndl)
@@ -37,9 +37,9 @@ StreamBufferHandle_t *crsf_init(CRSF_t *pHndl, StreamBufferHandle_t *pTx_hndl) {
     // Setup the CRSF rx task
     pHndl->tsk.hndl = xTaskCreateStatic(vCRSF_Hndl_tsk,
                                         "CRSF",
-                                        configMINIMAL_STACK_SIZE,
+                                        CRSF_STACK_SIZE,
                                         (void *) pHndl,
-                                        configMAX_PRIORITIES - 2,
+                                        2,
                                         pHndl->tsk.stack,
                                         &pHndl->tsk.static_tsk);
     if (!pHndl->tsk.hndl) {
@@ -47,7 +47,7 @@ StreamBufferHandle_t *crsf_init(CRSF_t *pHndl, StreamBufferHandle_t *pTx_hndl) {
         return NULL;
     }
 
-    return &pHndl->rx.hndl;
+    return pHndl->rx.hndl;
 }
 
 void vCRSF_Hndl_tsk(void *pvParams) {
@@ -65,11 +65,10 @@ void vCRSF_Hndl_tsk(void *pvParams) {
     }
 
     for (;;) {
-        // printf("CRSF Online\n");
         uint8_t new_byte = 0x00;
         // Wait for timeout duration to receive bytes from the buffer
-        size_t n_rx = xStreamBufferReceive(
-            pHndl->rx.hndl, &new_byte, 1, CRSF_TIMEOUT_MS);
+        size_t n_rx =
+            xStreamBufferReceive(pHndl->rx.hndl, &new_byte, 1, CRSF_TIMEOUT_MS);
 
         // Timeout Checks
         if (n_rx == 0) {
@@ -150,8 +149,8 @@ void vCRSF_Hndl_tsk(void *pvParams) {
                     break;
                 case CRSFMsgAtt:
                     pHndl->pkt.att.pitch = (float) msg->att.pitch;
-                    pHndl->pkt.att.yaw = (float) msg->att.pitch;
-                    pHndl->pkt.att.roll = (float) msg->att.pitch;
+                    pHndl->pkt.att.yaw = (float) msg->att.yaw;
+                    pHndl->pkt.att.roll = (float) msg->att.roll;
                     break;
                 default:
                     break;
