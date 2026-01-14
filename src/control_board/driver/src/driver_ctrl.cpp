@@ -49,7 +49,9 @@ void Driver::_ctrl_callback(void) {
         }
     }
     struct udev_pkt_ctrl_rx pkt_rx;
-    _usb_recv_ctrl(pkt_rx);
+    if(_usb_recv_ctrl(pkt_rx) != sizeof(pkt_rx)){
+        return;
+    }
 
     sensor_msgs::msg::BatteryState bat_msg;
     bat_msg.voltage = (float) pkt_rx.vBatt / 5.0f;
@@ -75,7 +77,16 @@ void Driver::_ctrl_callback(void) {
 }
 
 void Driver::_mode_callback(std_msgs::msg::UInt8& new_mode) {
+    _new_mode = (enum eCBMode) new_mode.data;
 }
 
 void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
+    if (!_usb_connected() || !_lusb_hndl) {
+        RCLCPP_ERROR(this->get_logger(), "USB Not Connected");
+        if (_usb_reconnect()) {
+            RCLCPP_ERROR(this->get_logger(), "USB Reconnect Failed");
+            return;
+        }
+    }
+    _usb_send_ctrl(qt, _new_mode);
 }

@@ -51,6 +51,8 @@ class Driver : public rclcpp::Node {
     void _ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls);
     // EP read callback
     rclcpp::TimerBase::SharedPtr _lidar_timer;
+    sensor_msgs::msg::LaserScan _ls_front, _ls_vertical;
+    size_t _ls_front_count = 0, _ls_vertical_count = 0;
     void _lidar_callback(void);
 
     // Control EP Callbacks
@@ -63,6 +65,7 @@ class Driver : public rclcpp::Node {
 
     // rclcpp::Subscription<std_msgs::msg::UInt8> _mode_sub;
     void _mode_callback(std_msgs::msg::UInt8& new_mode);
+    enum eCBMode _new_mode;
     // rclcpp::Subscription<geometry_msgs::msg::Quaternion> _vel_cmd_sub;
     void _vel_callback(const geometry_msgs::msg::Quaternion& qt);
 };

@@ -124,15 +124,25 @@ static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
         // char ar[] = "Hello1\nHello2\nHello3\nHello4\n";
         if (xQueueReceiveFromISR(usbi.ctrl_rx, &pkt_ctrl_rx, &higher_woken) ==
             pdTRUE) {
-            usbd_ep_write(
-                dev, ep, (void *) &pkt_ctrl_rx, sizeof(struct udev_pkt_ctrl_rx));
+            usbd_ep_write(dev,
+                          ep,
+                          (void *) &pkt_ctrl_rx,
+                          sizeof(struct udev_pkt_ctrl_rx));
         } else {
             usbd_ep_write(dev, ep, (void *) &pkt_ctrl_rx, 0);
         }
     }
     portYIELD_FROM_ISR(higher_woken);
 }
+struct udev_pkt_lidar ldrpkt;
 static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
+    // if (evt == usbd_evt_eprx) {
+    //     usbd_ep_read(
+    //         dev, ep, (void *) &ldrpkt, sizeof(struct udev_pkt_lidar));
+    // } else {
+    //     usbd_ep_write(
+    //         dev, ep, (void *) &ldrpkt, sizeof(struct udev_pkt_lidar));
+    // }
     BaseType_t higher_woken = pdFALSE;
     struct udev_pkt_lidar pkt_lidar = {0};
     if (evt == usbd_evt_eprx) {
@@ -143,7 +153,7 @@ static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
             q = &usbi.lidar_rx_front;
         }
         if (xQueueSendFromISR(*q, &pkt_lidar, &higher_woken) == errQUEUE_FULL) {
-            xQueueOverwriteFromISR(*q, &pkt_lidar, &higher_woken);
+            // Handle the failure
         }
     } else {
         // Interleave lidar transmission over a single channel
@@ -173,6 +183,12 @@ static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg) {
         usbd_ep_deconfig(dev, CTRL_RXD_EP);
         usbd_reg_endpoint(dev, CTRL_RXD_EP, 0);
         usbd_reg_endpoint(dev, CTRL_TXD_EP, 0);
+
+        usbd_ep_deconfig(dev, LIDAR_NTF_EP);
+        usbd_ep_deconfig(dev, LIDAR_TXD_EP);
+        usbd_ep_deconfig(dev, LIDAR_RXD_EP);
+        usbd_reg_endpoint(dev, LIDAR_RXD_EP, 0);
+        usbd_reg_endpoint(dev, LIDAR_TXD_EP, 0);
         return usbd_ack;
     case 1:
         /* configuring device */
@@ -186,12 +202,25 @@ static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg) {
                        CTRL_DATA_SZ);
         usbd_ep_config(dev, CTRL_NTF_EP, USB_EPTYPE_INTERRUPT, CTRL_NTF_SZ);
 
-        // TODO: Add back these functions
+        usbd_ep_config(dev,
+                       LIDAR_RXD_EP,
+                       USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
+                       LIDAR_DATA_SZ);
+        usbd_ep_config(dev,
+                       LIDAR_TXD_EP,
+                       USB_EPTYPE_BULK /*| USB_EPTYPE_DBLBUF*/,
+                       LIDAR_DATA_SZ);
+        usbd_ep_config(dev, LIDAR_NTF_EP, USB_EPTYPE_INTERRUPT, CTRL_NTF_SZ);
+
         usbd_reg_endpoint(dev, CTRL_RXD_EP, ctrl_rxtx);
         usbd_reg_endpoint(dev, CTRL_TXD_EP, ctrl_rxtx);
+        usbd_reg_endpoint(dev, LIDAR_RXD_EP, lidar_rxtx);
+        usbd_reg_endpoint(dev, LIDAR_TXD_EP, lidar_rxtx);
 
         usbd_ep_write(dev, CTRL_TXD_EP, 0, 0);
         usbd_ep_write(dev, CTRL_TXD_EP, 0, 0);
+        usbd_ep_write(dev, LIDAR_TXD_EP, 0, 0);
+        usbd_ep_write(dev, LIDAR_TXD_EP, 0, 0);
         return usbd_ack;
     default:
         return usbd_fail;

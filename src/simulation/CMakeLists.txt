@@ -6,5 +6,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 include(lidarstreams/build.cmake)
+include(control/build.cmake)
 
 ament_package()

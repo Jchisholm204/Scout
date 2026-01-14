@@ -15,7 +15,7 @@ Driver::Driver() : Node("cb_driver") {
 
     this->declare_parameter("publish_base", "cb");
     std::string pub_base = this->get_parameter("publish_base").as_string();
-    this->declare_parameter("ctrl_rate", 50);
+    this->declare_parameter("ctrl_rate", 10);
     int ctrl_rate = this->get_parameter("ctrl_rate").as_int();
     this->declare_parameter("lidar_rate", 50);
     int lidar_rate = this->get_parameter("lidar_rate").as_int();
@@ -49,10 +49,10 @@ Driver::Driver() : Node("cb_driver") {
         this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/out/ls_vertical",
                                                             10);
     _ls_front_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        pub_base + "/in/ls_front", 10,
+        "lidar_front_frame", 10,
         std::bind(&Driver::_ls_front_callback, this, std::placeholders::_1));
     _ls_vertical_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        pub_base + "/in/ls_vertical", 10,
+        "lidar_vertical_frame", 10,
         std::bind(&Driver::_ls_vertical_callback, this, std::placeholders::_1));
 
     _lidar_timer = this->create_wall_timer(std::chrono::milliseconds(lidar_rate),

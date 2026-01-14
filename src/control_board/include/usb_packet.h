@@ -24,7 +24,8 @@
 #include <assert.h>
 #include <stdint.h>
 
-#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 2) / 2)
+#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 4) / 2)
+#define UDEV_SEQ_MAX (180/UDEV_LIDAR_POINTS)
 
 struct udev_pkt_ctrl_tx {
     union {
