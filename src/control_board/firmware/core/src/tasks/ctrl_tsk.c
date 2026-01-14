@@ -79,11 +79,11 @@ void vCtrlTsk(void *pvParams) {
         // pkt_rx.vel.z = (rc.chan0) / 2000.0f;
         // pkt_rx.vel.w = (rc.chan3) / 2000.0f;
 
-        printf("%1.3f %1.3f %1.3f %1.3f\n",
-               pkt_rx.vel.x,
-               pkt_rx.vel.y,
-               pkt_rx.vel.z,
-               pkt_rx.vel.w);
+        // printf("%1.3f %1.3f %1.3f %1.3f\n",
+        //        pkt_rx.vel.x,
+        //        pkt_rx.vel.y,
+        //        pkt_rx.vel.z,
+        //        pkt_rx.vel.w);
 
         BaseType_t e;
         if (pHndl->ctrl_rx) {

@@ -12,17 +12,12 @@
 #ifndef _DRONE_DEFS_H_
 #define _DRONE_DEFS_H_
 
-// Drone Propeller size in inches
-#define DRONE_PROP_SIZE 9
-
-// Drone Anti-Gravity PID values
-#define DRONE_ANTIG_P 1
-#define DRONE_ANTIG_I 0
-#define DRONE_ANTIG_D 0
-
 // Generic struct to describe drone position/velocity
 typedef struct {
-    float x, y, z, w;
-}  drone_pos_t;
+    union {
+        float x, y, z, w;
+        float data[4];
+    };
+} quat_t;
 
 #endif

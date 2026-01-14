@@ -147,7 +147,7 @@ static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
     struct udev_pkt_lidar pkt_lidar = {0};
     if (evt == usbd_evt_eprx) {
         usbd_ep_read(
-            dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_ctrl_tx));
+            dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));
         QueueHandle_t *q = &usbi.lidar_rx_vertical;
         if (pkt_lidar.hdr.id == eLidarFront) {
             q = &usbi.lidar_rx_front;
@@ -157,16 +157,17 @@ static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
         }
     } else {
         // Interleave lidar transmission over a single channel
-        QueueHandle_t *q = &usbi.lidar_tx_vertical;
-        if (lidar_primary_rx == eLidarFront) {
-            *q = usbi.lidar_tx_front;
-            lidar_primary_rx = eLidarVertical;
-        } else {
-            lidar_primary_rx = eLidarFront;
-        }
-        if (xQueueReceiveFromISR(*q, &pkt_lidar, &higher_woken) == pdTRUE) {
+        // QueueHandle_t *q = &usbi.lidar_tx_vertical;
+        // if (lidar_primary_rx == eLidarFront) {
+        //     *q = usbi.lidar_tx_front;
+        //     lidar_primary_rx = eLidarVertical;
+        // } else {
+        //     lidar_primary_rx = eLidarFront;
+        // }
+        if (xQueueReceiveFromISR(
+                usbi.lidar_tx_front, &pkt_lidar, &higher_woken) == pdTRUE) {
             usbd_ep_write(
-                dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_ctrl_rx));
+                dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));
         } else {
             usbd_ep_write(dev, ep, (void *) 0, 0);
         }

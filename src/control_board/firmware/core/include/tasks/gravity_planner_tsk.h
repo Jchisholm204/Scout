@@ -13,66 +13,44 @@
 #define _GRAVITY_PLANNER_H_
 #include "FreeRTOS.h"
 #include "config/sys_cfg.h"
-#include "protocols/crsf/crsf.h"
 #include "drone_defs.h"
-#include "protocols/rplidar/rplidar.h"
+#include "usb_packet.h"
+#include "queue.h"
 #include "semphr.h"
-#include "stream_buffer.h"
 
 #include <stdio.h>
 
-typedef enum {
-    eGPOK
-} eGPlanErrror;
+// Must be 1 to only hold most recent value
+#define GPLAN_CVTX_BUF_SIZE 1
 
-typedef struct {
+struct gplan_tsk {
 
     // Task information
-    TaskHandle_t tsk_hndl;
-    StaticTask_t tsk_buf;
-    StackType_t tsk_stack[configMINIMAL_STACK_SIZE];
+    struct {
+        TaskHandle_t hndl;
+        StaticTask_t static_tsk;
+        StackType_t stack[configMINIMAL_STACK_SIZE];
+    } tsk;
 
-    StreamBufferHandle_t* tx_hndl;
+    // Output Queue
+    struct {
+        QueueHandle_t hndl;
+        StaticQueue_t static_queue;
+        quat_t buf[GPLAN_CVTX_BUF_SIZE];
+    } cv_tx;
 
-    // XY Lidar
-    RpLidar_t *lxy_pLidar;
-    RpLidarScan lxy_scan;
+    struct {
+        QueueHandle_t rx_front;
+        QueueHandle_t rx_vertical;
+        QueueHandle_t tx_front;
+        QueueHandle_t tx_vertical;
+    } usb;
+};
 
-    // ZX Lidar
-    RpLidar_t *lzx_pLidar;
-    RpLidarScan lzx_scan;
-
-} GPlan_t;
-
-/**
- * @brief Init the Gravity Planner Task
- *
- * @param pHndl Gravity Planner Instance Handle
- * @param pLidarXY Lidar instance that scans the XY plane
- * @param pLidarZX Lidar instance that scans the ZX plane
- * @return 
- */
-extern eGPlanErrror gplan_init(GPlan_t* pHndl,
-                               RpLidar_t* pLidarXY,
-                               RpLidar_t* pLidarZX);
-
-
-/**
- * @brief Register a notifier callback for when gplan computes the collision velocity
- *
- * @param pHndl Gravity Planner Handle
- * @param notify_tskHndl Handle of task to notify
- * @return 
- */
-extern eGPlanErrror gplan_notify(GPlan_t *pHndl, TaskHandle_t *notify_tskHndl);
-
-/**
- * @brief Read the latest collision velocity
- *
- * @param pHndl Gravity Planner Handle
- * @param pVel Velocity to execute to avoid collision
- * @return 
- */
-extern eGPlanErrror gplan_read(GPlan_t *pHndl, drone_pos_t *pVel);
+extern QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
+                                    QueueHandle_t usb_rx_front,
+                                    QueueHandle_t usb_rx_vertical,
+                                    QueueHandle_t usb_tx_front,
+                                    QueueHandle_t usb_tx_vertical);
 
 #endif

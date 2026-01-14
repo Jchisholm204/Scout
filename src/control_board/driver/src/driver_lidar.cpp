@@ -70,6 +70,8 @@ void Driver::_ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls) {
     // _usb_send_ls(eLidarVertical, ls);
 }
 
+int k = 0;
+;
 void Driver::_lidar_callback(void) {
     if (!_usb_connected() || !_lusb_hndl) {
         RCLCPP_ERROR(this->get_logger(), "USB Not Connected");
@@ -80,10 +82,14 @@ void Driver::_lidar_callback(void) {
     }
     udev_pkt_lidar pkt;
     if (_usb_recv_ls(pkt) != sizeof(struct udev_pkt_lidar)) {
-        RCLCPP_WARN(this->get_logger(), "Failed to RX");
+        if (k) {
+            RCLCPP_WARN(this->get_logger(), "Failed to RX");
+            k = 0;
+        }
         return;
     }
-    RCLCPP_INFO(this->get_logger(), "Got %s\n", (char*) &pkt);
+    k = 1;
+    RCLCPP_INFO(this->get_logger(), "Got %s", (char*) &pkt);
     // sensor_msgs::msg::LaserScan& ls = _ls_front;
     // size_t& count = _ls_front_count;
     // if (pkt.hdr.id == eLidarVertical) {

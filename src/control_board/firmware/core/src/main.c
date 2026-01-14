@@ -31,10 +31,12 @@
 
 // Task Includes
 #include "tasks/ctrl_tsk.h"
+#include "tasks/gravity_planner_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
+struct gplan_tsk gplan_tsk;
 
 // Initialize all system Interfaces
 void Init(void) {
@@ -63,6 +65,11 @@ void Init(void) {
      * Tasks can be initialized dynamically, but may crash the system if they
      * overflow the system memory (128Kb for the STM32f446)
      */
+    QueueHandle_t cv_qh = gplan_tsk_init(&gplan_tsk,
+                                         usbi->lidar_rx_front,
+                                         usbi->lidar_rx_vertical,
+                                         usbi->lidar_tx_front,
+                                         usbi->lidar_tx_vertical);
     ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx);
     // crsf_init(&tsk_crsf, &Serial2, PIN_USART2_RX, PIN_USART2_TX);
     xTaskCreate(
