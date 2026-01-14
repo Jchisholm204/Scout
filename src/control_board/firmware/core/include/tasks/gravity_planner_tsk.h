@@ -14,9 +14,9 @@
 #include "FreeRTOS.h"
 #include "config/sys_cfg.h"
 #include "drone_defs.h"
-#include "usb_packet.h"
 #include "queue.h"
 #include "semphr.h"
+#include "usb_packet.h"
 
 #include <stdio.h>
 
@@ -40,17 +40,12 @@ struct gplan_tsk {
     } cv_tx;
 
     struct {
-        QueueHandle_t rx_front;
-        QueueHandle_t rx_vertical;
-        QueueHandle_t tx_front;
-        QueueHandle_t tx_vertical;
+        QueueHandle_t rx, tx;
     } usb;
 };
 
 extern QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
-                                    QueueHandle_t usb_rx_front,
-                                    QueueHandle_t usb_rx_vertical,
-                                    QueueHandle_t usb_tx_front,
-                                    QueueHandle_t usb_tx_vertical);
+                                    QueueHandle_t usb_rx,
+                                    QueueHandle_t usb_tx);
 
 #endif

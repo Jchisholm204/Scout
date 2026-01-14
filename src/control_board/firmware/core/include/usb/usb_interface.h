@@ -27,10 +27,8 @@
 
 struct usbi {
     // RX/TX From side of Device
-    QueueHandle_t lidar_rx_front;
-    QueueHandle_t lidar_rx_vertical;
-    QueueHandle_t lidar_tx_front;
-    QueueHandle_t lidar_tx_vertical;
+    QueueHandle_t lidar_rx;
+    QueueHandle_t lidar_tx;
     // RX/TX From side of host
     QueueHandle_t ctrl_tx;
     QueueHandle_t ctrl_rx;

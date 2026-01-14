@@ -37,16 +37,10 @@ static usbd_respond udev_setconf(usbd_device *dev, uint8_t cfg);
 
 // External Interfacing
 static struct usbi usbi;
-static StaticQueue_t usbi_lidar_rx_front_sqh;
-static struct udev_pkt_lidar usbi_lidar_rx_front_buf[USBI_LIDAR_BUF_SIZE] = {0};
-static StaticQueue_t usbi_lidar_rx_vertical_sqh = {0};
-static struct udev_pkt_lidar usbi_lidar_rx_vertical_buf[USBI_LIDAR_BUF_SIZE] = {
-    0};
-static StaticQueue_t usbi_lidar_tx_front_sqh = {0};
-static struct udev_pkt_lidar usbi_lidar_tx_front_buf[USBI_LIDAR_BUF_SIZE] = {0};
-static StaticQueue_t usbi_lidar_tx_vertical_sqh = {0};
-static struct udev_pkt_lidar usbi_lidar_tx_vertical_buf[USBI_LIDAR_BUF_SIZE] = {
-    0};
+static StaticQueue_t usbi_lidar_rx_sqh;
+static struct udev_pkt_lidar usbi_lidar_rx_buf[USBI_LIDAR_BUF_SIZE] = {0};
+static StaticQueue_t usbi_lidar_tx_sqh = {0};
+static struct udev_pkt_lidar usbi_lidar_tx_buf[USBI_LIDAR_BUF_SIZE] = {0};
 static StaticQueue_t usbi_ctrl_tx_sqh = {0};
 static struct udev_pkt_ctrl_tx usbi_ctrl_tx_buf[USBI_CTRL_BUF_SIZE] = {0};
 static StaticQueue_t usbi_ctrl_rx_sqh = {0};
@@ -73,29 +67,15 @@ struct usbi *usbi_init(void) {
 
     // External Interface Setup
 
-    usbi.lidar_rx_front =
-        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
-                           sizeof(struct udev_pkt_lidar),
-                           (uint8_t *) usbi_lidar_rx_front_buf,
-                           &usbi_lidar_rx_front_sqh);
+    usbi.lidar_rx = xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
+                                       sizeof(struct udev_pkt_lidar),
+                                       (uint8_t *) usbi_lidar_rx_buf,
+                                       &usbi_lidar_rx_sqh);
 
-    usbi.lidar_rx_vertical =
-        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
-                           sizeof(struct udev_pkt_lidar),
-                           (uint8_t *) usbi_lidar_rx_vertical_buf,
-                           &usbi_lidar_rx_vertical_sqh);
-
-    usbi.lidar_tx_front =
-        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
-                           sizeof(struct udev_pkt_lidar),
-                           (uint8_t *) usbi_lidar_tx_front_buf,
-                           &usbi_lidar_tx_front_sqh);
-
-    usbi.lidar_rx_vertical =
-        xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
-                           sizeof(struct udev_pkt_lidar),
-                           (uint8_t *) usbi_lidar_tx_vertical_buf,
-                           &usbi_lidar_tx_vertical_sqh);
+    usbi.lidar_tx = xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
+                                       sizeof(struct udev_pkt_lidar),
+                                       (uint8_t *) usbi_lidar_tx_buf,
+                                       &usbi_lidar_tx_sqh);
 
     usbi.ctrl_tx = xQueueCreateStatic(USBI_CTRL_BUF_SIZE,
                                       sizeof(struct udev_pkt_ctrl_tx),
@@ -136,36 +116,18 @@ static void ctrl_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
 }
 struct udev_pkt_lidar ldrpkt;
 static void lidar_rxtx(usbd_device *dev, uint8_t evt, uint8_t ep) {
-    // if (evt == usbd_evt_eprx) {
-    //     usbd_ep_read(
-    //         dev, ep, (void *) &ldrpkt, sizeof(struct udev_pkt_lidar));
-    // } else {
-    //     usbd_ep_write(
-    //         dev, ep, (void *) &ldrpkt, sizeof(struct udev_pkt_lidar));
-    // }
     BaseType_t higher_woken = pdFALSE;
     struct udev_pkt_lidar pkt_lidar = {0};
     if (evt == usbd_evt_eprx) {
         usbd_ep_read(
             dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));
-        QueueHandle_t *q = &usbi.lidar_rx_vertical;
-        if (pkt_lidar.hdr.id == eLidarFront) {
-            q = &usbi.lidar_rx_front;
-        }
-        if (xQueueSendFromISR(*q, &pkt_lidar, &higher_woken) == errQUEUE_FULL) {
+        if (xQueueSendFromISR(usbi.lidar_rx, &pkt_lidar, &higher_woken) ==
+            errQUEUE_FULL) {
             // Handle the failure
         }
     } else {
-        // Interleave lidar transmission over a single channel
-        // QueueHandle_t *q = &usbi.lidar_tx_vertical;
-        // if (lidar_primary_rx == eLidarFront) {
-        //     *q = usbi.lidar_tx_front;
-        //     lidar_primary_rx = eLidarVertical;
-        // } else {
-        //     lidar_primary_rx = eLidarFront;
-        // }
-        if (xQueueReceiveFromISR(
-                usbi.lidar_tx_front, &pkt_lidar, &higher_woken) == pdTRUE) {
+        if (xQueueReceiveFromISR(usbi.lidar_tx, &pkt_lidar, &higher_woken) ==
+            pdTRUE) {
             usbd_ep_write(
                 dev, ep, (void *) &pkt_lidar, sizeof(struct udev_pkt_lidar));
         } else {

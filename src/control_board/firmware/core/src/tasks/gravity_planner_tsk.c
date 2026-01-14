@@ -14,18 +14,14 @@
 void vGPlanTsk(void *pvParams);
 
 QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
-                             QueueHandle_t usb_rx_front,
-                             QueueHandle_t usb_rx_vertical,
-                             QueueHandle_t usb_tx_front,
-                             QueueHandle_t usb_tx_vertical) {
+                             QueueHandle_t usb_rx,
+                             QueueHandle_t usb_tx) {
     if (!pHndl) {
         return NULL;
     }
     // Initialize the usb queues
-    pHndl->usb.rx_front = usb_rx_front;
-    pHndl->usb.rx_vertical = usb_rx_vertical;
-    pHndl->usb.tx_front = usb_tx_front;
-    pHndl->usb.tx_vertical = usb_tx_vertical;
+    pHndl->usb.rx = usb_rx;
+    pHndl->usb.tx = usb_tx;
 
     // Setup the Collision Vector Output Queue
     pHndl->cv_tx.hndl = xQueueCreateStatic(GPLAN_CVTX_BUF_SIZE,
@@ -60,7 +56,7 @@ void vGPlanTsk(void *pvParams) {
         struct udev_pkt_lidar ldrpkt = {0};
         sniprintf((char *) &ldrpkt, sizeof(ldrpkt), "HelloFromGPlan\0");
         printf((const char *) &ldrpkt);
-        xQueueSendToBack(pHndl->usb.tx_front, &ldrpkt, 10);
+        xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
         vTaskDelay(100);
     }
 }
