@@ -1,3 +1,5 @@
+ST-LINK_CLI.exe
+
 build
 build/*
 .cache/*
