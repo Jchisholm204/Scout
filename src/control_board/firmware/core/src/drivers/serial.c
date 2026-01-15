@@ -14,12 +14,12 @@
 #include "config/nvic.h"
 
 static Serial_t SerialPort[eSerialN] = {
-    {USART1, USART1_IRQn, NULL, {0}, NULL, eSerialNoInit},
-    {USART2, USART2_IRQn, NULL, {0}, NULL, eSerialNoInit},
-    {USART3, USART3_IRQn, NULL, {0}, NULL, eSerialNoInit},
-    {UART4, UART4_IRQn, NULL, {0}, NULL, eSerialNoInit},
-    {UART5, UART5_IRQn, NULL, {0}, NULL, eSerialNoInit},
-    {USART6, USART6_IRQn, NULL, {0}, NULL, eSerialNoInit},
+    {USART1, USART1_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
+    {USART2, USART2_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
+    {USART3, USART3_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
+    {UART4, UART4_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
+    {UART5, UART5_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
+    {USART6, USART6_IRQn, NULL, {0}, NULL, NULL, eSerialNoInit},
 };
 
 Serial_t *serial_init(eSerial serial,
@@ -46,7 +46,35 @@ Serial_t *serial_init(eSerial serial,
     xSemaphoreGive(pHndl->tx_hndl);
     pHndl->state = eSerialOK;
 
+    pHndl->tx_buf = NULL;
+    pHndl->rx_buf = NULL;
+
     return pHndl;
+}
+
+StreamBufferHandle_t serial_create_write_buffer(
+    Serial_t *pSerial,
+    size_t xBufferSizeBytes,
+    size_t xTriggerLevelBytes,
+    uint8_t *const pucStreamBufferStorageArea,
+    StaticStreamBuffer_t *const pxStaticStreamBuffer) {
+    if(!pSerial){
+        return NULL;
+    }
+    StreamBufferHandle_t hndl =
+        xStreamBufferCreateStaticWithCallback(xBufferSizeBytes,
+                                              xTriggerLevelBytes,
+                                              pucStreamBufferStorageArea,
+                                              pxStaticStreamBuffer,
+                                              vSerial_RxCallback,
+                                              NULL);
+    if(!hndl){
+        return NULL;
+    }
+    pSerial->tx_buf = hndl;
+    NVIC_EnableIRQ(pSerial->IRQn);
+    NVIC_SetPriority(pSerial->IRQn, NVIC_Priority_MIN);
+    return hndl;
 }
 
 eSerialError serial_write(Serial_t *pHndl,
@@ -87,27 +115,67 @@ eSerialError serial_detach(Serial_t *pHndl) {
         return pHndl->state;
     pHndl->rx_buf = NULL;
     hal_uart_enable_rxne(pHndl->UART, false);
-    NVIC_DisableIRQ(pHndl->IRQn);
+    if (!pHndl->tx_buf) {
+        NVIC_DisableIRQ(pHndl->IRQn);
+    }
     return eSerialOK;
+}
+
+void vSerial_RxCallback(StreamBufferHandle_t xStreamBuffer,
+                        BaseType_t xIsInsideISR,
+                        BaseType_t *const pxHigherPriorityTaskWoken) {
+    (void) xStreamBuffer;
+    (void) xIsInsideISR;
+    (void) pxHigherPriorityTaskWoken;
+    // Enable all active ports with full buffers
+    for (int i = 0; i < eSerialN; i++) {
+        // Enable the TX interrupt if the serial state is OK and there is a TX
+        // buffer attached, and that buffer contains data elements to be read
+        if (SerialPort[i].state == eSerialOK && SerialPort[i].tx_buf != NULL) {
+
+            size_t bytes_avail =
+                xStreamBufferBytesAvailable(SerialPort[i].tx_buf);
+            if (bytes_avail > 0)
+                hal_uart_enable_txne(SerialPort[i].UART, true);
+        }
+    }
 }
 
 void generic_handler(Serial_t *pHndl) {
     // MUST read status to clear ORE/NF/FE flags
-    (void)hal_uart_read_status(pHndl->UART);
-    // MUST read input port to clear iPending bit
-    uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
-    // hal_uart_write_byte(pHndl->UART, rx_data);
-    // Check that a handler exists
-    if (pHndl->rx_buf == NULL || pHndl->state != eSerialOK) {
-        // If there is no handler disable this interrupt
-        hal_uart_enable_rxne(pHndl->UART, false);
-        NVIC_DisableIRQ(pHndl->IRQn);
-        return;
-    }
-    // If a buffer exists, run the interrupt routine
+    uint32_t status = hal_uart_read_status(pHndl->UART);
     BaseType_t higher_woken = pdFALSE;
-    xStreamBufferSendFromISR(
-        pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
+    // Interrupt Generated for Read
+    if (status & USART_SR_RXNE) {
+        // MUST read input port to clear iPending bit
+        uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
+        // hal_uart_write_byte(pHndl->UART, rx_data);
+        // Check that a handler exists
+        if (pHndl->rx_buf == NULL || pHndl->state != eSerialOK) {
+            // If there is no handler disable this interrupt
+            hal_uart_enable_rxne(pHndl->UART, false);
+            return;
+        }
+        // If a buffer exists, run the interrupt routine
+        xStreamBufferSendFromISR(
+            pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
+    }
+    if (status & USART_SR_TXE) {
+        if (pHndl->tx_buf == NULL || pHndl->state != eSerialOK) {
+            // If there is no handler disable this interrupt
+            hal_uart_enable_txne(pHndl->UART, false);
+            return;
+        }
+        uint8_t tx_data = 0;
+        if (xStreamBufferReceiveFromISR(
+                pHndl->tx_buf, &tx_data, 1, &higher_woken) == 1) {
+            hal_uart_write_byte(pHndl->UART, tx_data);
+        } else {
+            hal_uart_enable_txne(pHndl->UART, false);
+        }
+        // if (xStreamBufferBytesAvailable(pHndl->tx_buf) == 0) {
+        // }
+    }
     portYIELD_FROM_ISR(higher_woken);
 }
 

@@ -29,8 +29,6 @@ typedef enum {
     eSerialInitFail,
     // The Serial interface has not been Initialized
     eSerialNoInit,
-    // Serial interface is write locked
-    eSerialLocked,
     // Null reference passed
     eSerialNULL
 } eSerialError;
@@ -50,6 +48,7 @@ typedef struct Serial {
     IRQn_Type IRQn;
     SemaphoreHandle_t tx_hndl;
     StaticSemaphore_t static_tx_semphr;
+    StreamBufferHandle_t tx_buf;
     StreamBufferHandle_t rx_buf;
     eSerialError state;
 } Serial_t;
@@ -68,6 +67,13 @@ extern Serial_t *serial_init(eSerial serial,
                              pin_t pin_rx,
                              pin_t pin_tx);
 
+extern StreamBufferHandle_t serial_create_write_buffer(
+    Serial_t *pSerial,
+    size_t xBufferSizeBytes,
+    size_t xTriggerLevelBytes,
+    uint8_t *const pucStreamBufferStorageArea,
+    StaticStreamBuffer_t *const pxStaticStreamBuffer);
+
 /**
  * @brief Write to a Serial Interface (BLOCKING)
  *
@@ -81,7 +87,6 @@ extern eSerialError serial_write(Serial_t *pHndl,
                                  char *buf,
                                  size_t len,
                                  TickType_t timeout);
-
 
 /**
  * @brief Sttach an RX buffer to a Serial Interface
@@ -101,5 +106,17 @@ extern eSerialError serial_attach(Serial_t *pHndl,
  */
 extern eSerialError serial_detach(Serial_t *pHndl);
 
+/**
+ * @brief Serial RX Callback, Can be applied to freertos stream buffers for
+ * automatic Serial data buffer transmission
+ * Do not call this function directly
+ *
+ * @param xStreamBuffer
+ * @param xIsInsideISR
+ * @param pxHigherPriorityTaskWoken
+ */
+extern void vSerial_RxCallback(StreamBufferHandle_t xStreamBuffer,
+                               BaseType_t xIsInsideISR,
+                               BaseType_t *const pxHigherPriorityTaskWoken);
 
 #endif
