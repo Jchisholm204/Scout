@@ -58,7 +58,7 @@ StreamBufferHandle_t serial_create_write_buffer(
     size_t xTriggerLevelBytes,
     uint8_t *const pucStreamBufferStorageArea,
     StaticStreamBuffer_t *const pxStaticStreamBuffer) {
-    if(!pSerial){
+    if (!pSerial) {
         return NULL;
     }
     StreamBufferHandle_t hndl =
@@ -68,7 +68,7 @@ StreamBufferHandle_t serial_create_write_buffer(
                                               pxStaticStreamBuffer,
                                               vSerial_RxCallback,
                                               NULL);
-    if(!hndl){
+    if (!hndl) {
         return NULL;
     }
     pSerial->tx_buf = hndl;
@@ -145,8 +145,9 @@ void generic_handler(Serial_t *pHndl) {
     // MUST read status to clear ORE/NF/FE flags
     uint32_t status = hal_uart_read_status(pHndl->UART);
     BaseType_t higher_woken = pdFALSE;
+
     // Interrupt Generated for Read
-    if (status & USART_SR_RXNE) {
+    if (status & USART_SR_RXNE || status & USART_SR_ORE) {
         // MUST read input port to clear iPending bit
         uint8_t rx_data = hal_uart_read_byte(pHndl->UART);
         // hal_uart_write_byte(pHndl->UART, rx_data);
@@ -160,7 +161,7 @@ void generic_handler(Serial_t *pHndl) {
         xStreamBufferSendFromISR(
             pHndl->rx_buf, &rx_data, sizeof(rx_data), &higher_woken);
     }
-    if (status & USART_SR_TXE) {
+    if (status & USART_SR_TXE && pHndl->UART->CR1 & USART_CR1_TXEIE) {
         if (pHndl->tx_buf == NULL || pHndl->state != eSerialOK) {
             // If there is no handler disable this interrupt
             hal_uart_enable_txne(pHndl->UART, false);
@@ -173,8 +174,6 @@ void generic_handler(Serial_t *pHndl) {
         } else {
             hal_uart_enable_txne(pHndl->UART, false);
         }
-        // if (xStreamBufferBytesAvailable(pHndl->tx_buf) == 0) {
-        // }
     }
     portYIELD_FROM_ISR(higher_woken);
 }
