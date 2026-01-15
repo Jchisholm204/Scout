@@ -52,7 +52,8 @@ class Driver : public rclcpp::Node {
     // EP read callback
     rclcpp::TimerBase::SharedPtr _lidar_timer;
     sensor_msgs::msg::LaserScan _ls_front, _ls_vertical;
-    size_t _ls_front_count = 0, _ls_vertical_count = 0;
+    int _ls_front_count = 0, _ls_vertical_count = 0;
+    bool ldr_data_stale = 1;
     void _lidar_callback(void);
 
     // Control EP Callbacks

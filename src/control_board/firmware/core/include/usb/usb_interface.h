@@ -19,7 +19,7 @@
 #include "usb_packet.h"
 
 // Lidar Buffer size (number of usb packets)
-#define USBI_LIDAR_BUF_SIZE 8
+#define USBI_LIDAR_BUF_SIZE 12
 
 // Control Buffer size
 // Only keep the most recent control packet

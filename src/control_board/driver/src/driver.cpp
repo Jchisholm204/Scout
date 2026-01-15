@@ -17,7 +17,7 @@ Driver::Driver() : Node("cb_driver") {
     std::string pub_base = this->get_parameter("publish_base").as_string();
     this->declare_parameter("ctrl_rate", 10);
     int ctrl_rate = this->get_parameter("ctrl_rate").as_int();
-    this->declare_parameter("lidar_rate", 10);
+    this->declare_parameter("lidar_rate", 50);
     int lidar_rate = this->get_parameter("lidar_rate").as_int();
 
     // Begin Libusb Initialization

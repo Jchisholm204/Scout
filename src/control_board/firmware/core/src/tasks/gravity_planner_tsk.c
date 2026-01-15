@@ -62,6 +62,6 @@ void vGPlanTsk(void *pvParams) {
         if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) == pdTRUE) {
             xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
         }
-        vTaskDelayUntil(&last_wake_time, 5);
+        // vTaskDelayUntil(&last_wake_time, 1);
     }
 }
