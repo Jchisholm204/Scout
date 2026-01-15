@@ -11,7 +11,8 @@
 
 #include "protocols/rplidar/rplidar.h"
 
-#define RPLIDAR_BAUD 1234
+// from https://bucket-download.slamtec.com/2d4664be9f9f5c748f3b608f2cf1862962b168eb/SLAMTEC_rplidar_datasheet_C1_v1.1_en.pdf at page 14
+#define RPLIDAR_BAUD 460800
 #define RPLIDAR_SLOCK 0x7787
 
 void vRpLidar_tsk(void* pvParams);
@@ -74,6 +75,22 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
     }
 
     // Initialize LiDAR Device
+    
+    // send a GET_INFO request
+    // wait
+    // receive GET_INFO response descriptor
+    // output to stdout in debug mode to see it
+    // wait
+    // receive GET_INFO data response
+    // output to stdout in debug mode to see it
+
+
+
+    // send a GET_HEALTH request
+    // wait
+    // receive GET_HEALTH response descriptor
+    // wait
+    // receive GET_HEALTH 
 
     return eRpLidarOK;
 }
