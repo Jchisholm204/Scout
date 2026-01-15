@@ -13,6 +13,9 @@
 #define _RPLIDAR_H_
 #include "drivers/serial.h"
 
+// from https://download-en.slamtec.com/api/download/rplidar-c1-datasheet/1?lang=en at page 14
+#define RPLIDAR_BAUD 460800
+
 #define RPLIDAR_N_POINTS 360
 
 #define RPLIDAR_NOTIFY_NEW 0x1
@@ -30,6 +33,15 @@ typedef enum {
     eRpLidarSemFail,
     eRpLidarNoPkt,
 } eRpLidarError;
+
+typedef struct {
+    uint8_t start_flag1; // 0xA5
+    uint8_t start_flag2; // 0x5A
+    uint32_t data_response_detail; // 30bits for data length in bytes, 2bits for send mode: 00 for single response, 01 for multiple response
+    uint8_t data_type; 
+} RpLidarResponseDescriptor __attribute__((packed));
+
+#define RPLIDAR_RESPONSE_DESCRIPTOR ((RpLidarResponseDescriptor){.start_flag1=0xA5, .start_flag2=0x5A, .data_response_detail=0, .data_type=0})
 
 typedef struct {
     float angle;

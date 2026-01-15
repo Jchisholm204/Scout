@@ -11,10 +11,6 @@
 
 #include "protocols/rplidar/rplidar.h"
 
-// from https://bucket-download.slamtec.com/2d4664be9f9f5c748f3b608f2cf1862962b168eb/SLAMTEC_rplidar_datasheet_C1_v1.1_en.pdf at page 14
-#define RPLIDAR_BAUD 460800
-#define RPLIDAR_SLOCK 0x7787
-
 void vRpLidar_tsk(void* pvParams);
 
 eRpLidarError rplidar_init(RpLidar_t* pHndl,
@@ -33,31 +29,12 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
         return pHndl->state;
     }
 
-    // Initialize Self
-    pHndl->pSerial = pSerial;
-    eSerialError se = eSerialOK;
-    if ((se = serial_init(pSerial, RPLIDAR_BAUD, srx, stx)) != eSerialOK) {
-        pHndl->state = eRpLidarSerialFail;
-        return pHndl->state;
-    }
-
-    // Ensure nothing else can write to the CRSF serial port
-    se = serial_lock(pSerial, RPLIDAR_SLOCK);
-    if (se != eSerialOK)
-        return eRpLidarSerialFail;
-
     pHndl->rx_hndl = xStreamBufferCreateStatic(RPLIDAR_BUF_LEN,
                                                1 /*!!change this!!*/,
                                                pHndl->rx_buf,
                                                &pHndl->rx_streamBuf);
     if (!pHndl->rx_hndl) {
         pHndl->state = eRpLidarInitFail;
-        return pHndl->state;
-    }
-
-    se = serial_attach(pSerial, &pHndl->rx_hndl);
-    if (se != eSerialOK) {
-        pHndl->state = eRpLidarSerialFail;
         return pHndl->state;
     }
 
@@ -75,22 +52,6 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
     }
 
     // Initialize LiDAR Device
-    
-    // send a GET_INFO request
-    // wait
-    // receive GET_INFO response descriptor
-    // output to stdout in debug mode to see it
-    // wait
-    // receive GET_INFO data response
-    // output to stdout in debug mode to see it
-
-
-
-    // send a GET_HEALTH request
-    // wait
-    // receive GET_HEALTH response descriptor
-    // wait
-    // receive GET_HEALTH 
 
     return eRpLidarOK;
 }
@@ -114,4 +75,25 @@ eRpLidarError rplidar_read(RpLidar_t* pHndl, RpLidarScan* const pScan) {
     return eRpLidarOK;
 }
 
-void vRpLidar_tsk(void* pvParams);
+void vRpLidar_tsk(void* pvParams){
+    
+    // send a GET_INFO request
+    // output to stdout in debug mode to see sent request
+    // wait
+    // receive GET_INFO response descriptor
+    // output to stdout in debug mode to see response
+    // wait
+    // receive GET_INFO data response
+    // output to stdout in debug mode to see response
+
+
+
+    // send a GET_HEALTH request
+    // wait
+    // receive GET_HEALTH response descriptor
+    // wait
+    // receive GET_HEALTH 
+
+
+    
+}
