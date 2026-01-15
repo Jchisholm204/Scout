@@ -31,6 +31,7 @@
 
 // Protocol Includes
 #include "protocols/rplidar/rplidar.h"
+RpLidar_t rplidar_tsk;
 
 // Task Includes
 #include "tasks/ctrl_tsk.h"
@@ -52,6 +53,7 @@ void Init(void) {
     // Init USB Interface
     struct usbi *usbi = usbi_init();
 
+#if defined(BOARD_NUCLEOZE)
     // Initialize UART
     Serial_t *Serial3 =
         serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);
@@ -74,6 +76,27 @@ void Init(void) {
     CtrlQueueHndl_t slqh =
         sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+#elif defined(BOARD_ARMV1)
+    // Initialize UART
+    Serial_t *Serial5 =
+        serial_init(eSerial5, /*baud*/ 115200, PIN_UART5_RX, PIN_UART5_TX);
+    Serial_t *Serial3 =
+        serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
+
+    // Register Serial Port 5 as STDIO
+    // (Use this serial port for printf)
+    register_stdio(Serial5);
+
+    /**
+     * Initialize System Tasks...
+     * All tasks should be initialized as static
+     * Tasks can be initialized dynamically, but may crash the system if they
+     * overflow the system memory (128Kb for the STM32f446)
+     */
+    test_tsk_init(&test_tsk, 1000);
+    rplidar_init(&rplidar_tsk, Serial3, PIN_USART3_TX, PIN_USART3_RX);
+    
+#endif
 
     return;
 }
