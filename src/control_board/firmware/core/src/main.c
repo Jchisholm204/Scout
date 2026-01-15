@@ -29,6 +29,9 @@
 // USB Includes
 #include "usb/usb_interface.h"
 
+// Protocol Includes
+#include "protocols/rplidar/rplidar.h"
+
 // Task Includes
 #include "tasks/ctrl_tsk.h"
 #include "tasks/gravity_planner_tsk.h"
