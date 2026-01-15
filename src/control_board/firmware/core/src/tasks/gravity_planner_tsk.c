@@ -55,11 +55,13 @@ void vGPlanTsk(void *pvParams) {
 
     printf("Gplan Online\n");
 
+    TickType_t last_wake_time = xTaskGetTickCount();
+
     for (;;) {
         static struct udev_pkt_lidar ldrpkt = {0};
         if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) == pdTRUE) {
             xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
         }
-        vTaskDelay(5);
+        vTaskDelayUntil(&last_wake_time, 5);
     }
 }

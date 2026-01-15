@@ -57,7 +57,8 @@ void vTsk_testOnline(void *pvParams) {
     gpio_set_mode(PIN_LED2, GPIO_MODE_OUTPUT);
     gpio_set_mode(PIN_LED3, GPIO_MODE_OUTPUT);
     uint8_t leds = 1U;
-    vTaskDelay(1000);
+    vTaskDelay(pHndl->delay_ticks);
+    TickType_t last_wake_time = xTaskGetTickCount();
     for (;;) {
         leds ^= 0x3U;
         gpio_write(PIN_LED1, leds & 0x1U);
@@ -65,6 +66,6 @@ void vTsk_testOnline(void *pvParams) {
         struct systime t;
         systime_fromTicks(xTaskGetTickCount(), &t);
         printf("Time: %s\n", t.str);
-        vTaskDelay(pHndl->delay_ticks);
+        vTaskDelayUntil(&last_wake_time, pHndl->delay_ticks);
     }
 }
