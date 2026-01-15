@@ -1,4 +1,5 @@
 ST-LINK_CLI.exe
+.vscode
 
 build
 build/*
