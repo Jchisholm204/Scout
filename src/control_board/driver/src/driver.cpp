@@ -58,6 +58,20 @@ Driver::Driver() : Node("cb_driver") {
     _lidar_timer = this->create_wall_timer(std::chrono::milliseconds(lidar_rate),
                                            std::bind(&Driver::_lidar_callback, this));
 
+    _ls_front.ranges.resize(180);
+    _ls_front.intensities.resize(180);
+    for (int i = 0; i < 180; i++) {
+        _ls_front.ranges[i] = 2.0f;
+        _ls_front.intensities[i] = 1.0f;
+    }
+
+    _ls_vertical.ranges.resize(180);
+    _ls_vertical.intensities.resize(180);
+    for (int i = 0; i < 180; i++) {
+        _ls_vertical.ranges[i] = 2.0f;
+        _ls_vertical.intensities[i] = 1.0f;
+    }
+
     // END Lidar Interfaces
 
     // BEGIN Control Interfaces
