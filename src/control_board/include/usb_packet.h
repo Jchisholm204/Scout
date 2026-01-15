@@ -25,8 +25,9 @@
 #include <stdint.h>
 
 #define UDEV_LIDAR_RANGE 180
-#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 2) / 2)
-#define UDEV_SEQ_MAX ((UDEV_LIDAR_RANGE - 1 + UDEV_LIDAR_POINTS) / UDEV_LIDAR_POINTS)
+#define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 4) / 2)
+#define UDEV_LIDAR_SEQ_MAX ((UDEV_LIDAR_RANGE - 1 + UDEV_LIDAR_POINTS) / UDEV_LIDAR_POINTS)
+#define UDEV_SEQ_MAX UDEV_LIDAR_SEQ_MAX
 
 struct udev_pkt_ctrl_tx {
     union {
@@ -57,6 +58,7 @@ struct udev_pkt_lidar {
         uint8_t sequence : 7;
         uint8_t len;
     } __attribute__((packed)) hdr;
+    uint16_t distance_sum;
     // distance (mm) = distance / 4.0
     uint16_t distances[UDEV_LIDAR_POINTS];
 } __attribute__((aligned(4)));
