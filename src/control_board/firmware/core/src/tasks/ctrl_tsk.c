@@ -18,32 +18,36 @@
 void vCtrlTsk(void *pvParams);
 
 int ctrl_tsk_init(struct ctrl_tsk *pHndl,
-                  Serial_t *pSerial,
-                  QueueHandle_t ctrl_rx,
-                  QueueHandle_t ctrl_tx,
+                  Serial_t *rc_serial,
+                  QueueHandle_t usb_rx,
+                  QueueHandle_t usb_tx,
                   QueueHandle_t col_rx) {
-    pHndl->pSerial = pSerial;
-    pHndl->tsk_hndl = xTaskCreateStatic(vCtrlTsk,
+
+    pHndl->tsk.hndl = xTaskCreateStatic(vCtrlTsk,
                                         "ctrl_tsk",
                                         CTRL_TSK_STACK_SIZE,
                                         pHndl,
                                         configMAX_PRIORITIES - 2,
-                                        pHndl->tsk_stack,
-                                        &pHndl->tsk_buf);
+                                        pHndl->tsk.stack,
+                                        &pHndl->tsk.static_task);
 
-    pHndl->tx_hndl = xStreamBufferCreateStatic(
-        configMINIMAL_STACK_SIZE, 1, pHndl->tx_buf, &pHndl->tx_streamBuf);
+    pHndl->rc_crsf.buf_hndl =
+        xStreamBufferCreateStatic(configMINIMAL_STACK_SIZE,
+                                  1,
+                                  pHndl->rc_crsf.storage_area,
+                                  &pHndl->rc_crsf.stream_buffer);
 
-    StreamBufferHandle_t rx_hndl = crsf_init(&pHndl->crsf, pHndl->tx_hndl);
+    StreamBufferHandle_t rx_hndl =
+        crsf_init(&pHndl->rc_crsf.crsf, pHndl->rc_crsf.buf_hndl);
 
     if (!rx_hndl) {
         printf("CRSF INI Fail\n");
     }
 
-    serial_attach(pHndl->pSerial, rx_hndl);
+    serial_attach(rc_serial, rx_hndl);
 
-    pHndl->ctrl_rx = ctrl_rx;
-    pHndl->ctrl_tx = ctrl_tx;
+    pHndl->usb.tx = usb_tx;
+    pHndl->usb.rx = usb_rx;
     pHndl->col_rx = col_rx;
 
     return 0;
@@ -78,6 +82,7 @@ enum eCtrlMode {
     eModeAuto = 1809,
 };
 
+
 void vCtrlTsk(void *pvParams) {
     struct ctrl_tsk *pHndl = pvParams;
 
@@ -101,7 +106,7 @@ void vCtrlTsk(void *pvParams) {
 
     for (;;) {
         crsf_rc_t rc;
-        crsf_read_rc(&pHndl->crsf, &rc);
+        crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
 
         float x = normalize_ctrl(normalize_crsf(rc.chan2));
         float y = normalize_ctrl(normalize_crsf(rc.chan1));
@@ -149,12 +154,7 @@ void vCtrlTsk(void *pvParams) {
         pkt_rx.vel.y = unnormal_ctrl(y);
         pkt_rx.vel.z = unnormal_ctrl(z);
         pkt_rx.vel.w = unnormal_ctrl(w);
-        BaseType_t e;
-        if (pHndl->ctrl_rx) {
-            if ((e = xQueueGenericSend(
-                     pHndl->ctrl_rx, &pkt_rx, 1, queueOVERWRITE)) != pdTRUE) {
-            }
-        }
+        (void) xQueueGenericSend(pHndl->usb.rx, &pkt_rx, 1, queueOVERWRITE);
 
         vTaskDelayUntil(&last_wake_time, 20);
     }
