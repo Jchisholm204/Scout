@@ -9,15 +9,17 @@
  * @copyright Copyright (c) 2025
  */
 
+// LEGACY - Left alone for hendrix
 #ifndef _GRAVITY_PLANNER_H_
 #define _GRAVITY_PLANNER_H_
+#warning "DEPRICATED"
 #include "FreeRTOS.h"
 #include "config/sys_cfg.h"
 #include "drone_defs.h"
 #include "queue.h"
 #include "semphr.h"
-#include "usb_packet.h"
 #include "usb_lidar.h"
+#include "usb_packet.h"
 
 #include <stdio.h>
 
@@ -41,7 +43,7 @@ struct gplan_tsk {
     struct {
         QueueHandle_t rx, tx;
     } usb;
-    
+
     ctrl_vec_t sums_front[UDEV_LIDAR_SEQ_MAX];
     ctrl_vec_t sums_vertical[UDEV_LIDAR_SEQ_MAX];
 };

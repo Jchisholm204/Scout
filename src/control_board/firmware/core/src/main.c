@@ -32,11 +32,13 @@
 // Task Includes
 #include "tasks/ctrl_tsk.h"
 #include "tasks/gravity_planner_tsk.h"
+#include "tasks/sim_lidar_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
 struct gplan_tsk gplan_tsk;
+struct sim_lidar_tsk sim_lidar_tsk;
 struct test_tsk test_tsk;
 
 // Initialize all system Interfaces
@@ -64,9 +66,11 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    QueueHandle_t cv_qh =
-        gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, cv_qh);
+    // QueueHandle_t slqh =
+    //     gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    CtrlQueueHndl_t slqh =
+        sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
 
     return;
 }
