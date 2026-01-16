@@ -10,7 +10,10 @@
  */
 
 #include "tasks/gravity_planner_tsk.h"
+
 #include "FreeRTOS.h"
+
+#include <math.h>
 
 void vGPlanTsk(void *pvParams);
 
@@ -39,7 +42,7 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
                                         "gplan",
                                         GPLAN_TSK_STACK_SIZE,
                                         pHndl,
-                                        configMAX_PRIORITIES-4,
+                                        configMAX_PRIORITIES - 4,
                                         pHndl->tsk.stack,
                                         &pHndl->tsk.static_tsk);
 
@@ -47,7 +50,21 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
         return NULL;
     }
 
+    // Setup the lidar data storage containers
+    for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
+        for (int j = 0; j < 4; j++) {
+            pHndl->sums_front[i].data[j] = 0.0f;
+            pHndl->sums_vertical[i].data[j] = 0.0f;
+        }
+    }
+
     return pHndl->cv_tx.hndl;
+}
+
+static inline float arm_sqrtf(float val) {
+    float res;
+    __asm volatile("vsqrt.f32 %0, %1" : "=t"(res) : "t"(val));
+    return res;
 }
 
 void vGPlanTsk(void *pvParams) {
@@ -57,11 +74,122 @@ void vGPlanTsk(void *pvParams) {
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    int count = 0;
+
+    float d_ground = 0;
+    float d_ceil = 0;
+
     for (;;) {
+        // Attempt to pull the latest packet from the incoming process queue
         static struct udev_pkt_lidar ldrpkt = {0};
-        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) == pdTRUE) {
-            xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
+        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) != pdTRUE) {
+            // Input Queue Empty
+            printf("Lidar Input Queue Empty\n");
+            continue;
         }
-        // vTaskDelayUntil(&last_wake_time, 1);
+
+        // Check that the packet has a valid seq number
+        if (ldrpkt.hdr.sequence >= UDEV_LIDAR_SEQ_MAX) {
+            continue;
+        }
+
+        // // Process the incoming data
+        float sum_x = 0.0f;
+        float sum_y = 0.0f;
+        int valid_points = 0;
+        for (int i = 0; i < ldrpkt.hdr.len; i++) {
+            float d = (float) ldrpkt.distances[i] / 4000.0f;
+            if (d > 45.0f || d < 0.1f) {
+                continue;
+            }
+            valid_points++;
+            float angle = udev_lidar_angle(ldrpkt.hdr.sequence, i);
+            float weight = 1.0f / d;
+            sum_x += weight * cosf(angle);
+            sum_y += weight * sinf(angle);
+        }
+
+        // Dont bother processing packets with no points
+        if (valid_points == 0) {
+            continue;
+        }
+
+        // Add the new resultant sum depending on lidar orientation
+        // if (ldrpkt.hdr.id == eLidarFront) {
+        //     pHndl->sums_front[ldrpkt.hdr.sequence].x = sum_x;
+        //     pHndl->sums_front[ldrpkt.hdr.sequence].y = sum_y;
+        //     pHndl->sums_front[ldrpkt.hdr.sequence].z = 0.0f;
+        //     pHndl->sums_front[ldrpkt.hdr.sequence].w = 0.0f;
+        // }
+        if (ldrpkt.hdr.id == eLidarVertical) {
+            pHndl->sums_vertical[ldrpkt.hdr.sequence].x = 0.0f;
+            pHndl->sums_vertical[ldrpkt.hdr.sequence].y = sum_y;
+            pHndl->sums_vertical[ldrpkt.hdr.sequence].z = sum_x;
+            pHndl->sums_vertical[ldrpkt.hdr.sequence].w = 0.0f;
+        } else {
+            continue;
+        }
+
+        // if (ldrpkt.hdr.id == eLidarVertical && ldrpkt.hdr.sequence == 3) {
+        //     d_ground = (float) ldrpkt.distances[0] / 4000.0f;
+        //     // printf("Ground Distance: %3.3f\n",
+        //     //        ((float) ldrpkt.distances[0] / 4000.0f));
+        // }
+        //
+        // if (ldrpkt.hdr.id == eLidarVertical && ldrpkt.hdr.sequence == 0) {
+        //     d_ceil = (float) ldrpkt.distances[0] / 4000.0f;
+        //     // printf("Ground Distance: %3.3f\n",
+        //     //        ((float) ldrpkt.distances[0] / 4000.0f));
+        // }
+
+        // Calculate the collision vector
+        quat_t qv;
+        qv.x = 0;
+        qv.y = 0;
+        qv.z = 0;
+        qv.w = 0;
+
+        for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
+            for (int j = 0; j < 4; j++) {
+                qv.data[j] += pHndl->sums_vertical[i].data[j];
+                // qv.data[j] += pHndl->sums_front[i].data[j];
+            }
+        }
+
+        // if (count >= 20) {
+        // if (ldrpkt.hdr.id == eLidarVertical) {
+        // count = 0;
+        // if (ldrpkt.hdr.sequence == 3)
+        // printf("S: %d X: %2.3f Y: %2.3f\n",
+        //        ldrpkt.hdr.sequence,
+        //        sum_x,
+        //        sum_y);
+        // printf("CV: ");
+        // for (int j = 0; j < 4; j++) {
+        //     printf("%2.4f ", qv.data[j]);
+        // }
+        // printf("\n");
+        // }
+        // count++;
+        // Send CV to control task
+        xQueueOverwrite(pHndl->cv_tx.hndl, &qv);
+
+        // float sum_sqrt = 0;
+        // for (int j = 0; j < 4; j++) {
+        //     sum_sqrt += qv.data[j] * qv.data[j];
+        // }
+        // sum_sqrt = arm_sqrtf(sum_sqrt);
+        // for (int j = 0; j < 4; j++) {
+        //     qv.data[j] = qv.data[j] / sum_sqrt;
+        // }
+
+        // Send the newly processed packet over USB for ROS LaserScan
+        (void) xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
+        // vTaskDelayUntil(&last_wake_time, 20);
+        // quat_t qt;
+        // qt.z = (d_ceil - d_ground) / ((d_ceil + d_ground));
+
+        // printf("D: %2.3f\n", qt.z);
+
     }
 }

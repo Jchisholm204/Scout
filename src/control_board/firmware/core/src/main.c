@@ -66,7 +66,7 @@ void Init(void) {
     test_tsk_init(&test_tsk, 1000);
     QueueHandle_t cv_qh =
         gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, cv_qh);
 
     return;
 }

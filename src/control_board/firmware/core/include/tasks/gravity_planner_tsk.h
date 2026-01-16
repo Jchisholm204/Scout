@@ -17,6 +17,7 @@
 #include "queue.h"
 #include "semphr.h"
 #include "usb_packet.h"
+#include "usb_lidar.h"
 
 #include <stdio.h>
 
@@ -44,6 +45,9 @@ struct gplan_tsk {
     struct {
         QueueHandle_t rx, tx;
     } usb;
+    
+    quat_t sums_front[UDEV_LIDAR_SEQ_MAX];
+    quat_t sums_vertical[UDEV_LIDAR_SEQ_MAX];
 };
 
 extern QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,

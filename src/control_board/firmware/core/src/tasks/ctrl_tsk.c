@@ -11,6 +11,7 @@
 
 #include "tasks/ctrl_tsk.h"
 
+#include "drone_defs.h"
 #include "queue.h"
 #include "usb_packet.h"
 
@@ -19,7 +20,8 @@ void vCtrlTsk(void *pvParams);
 int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                   Serial_t *pSerial,
                   QueueHandle_t ctrl_rx,
-                  QueueHandle_t ctrl_tx) {
+                  QueueHandle_t ctrl_tx,
+                  QueueHandle_t col_rx) {
     pHndl->pSerial = pSerial;
     pHndl->tsk_hndl = xTaskCreateStatic(vCtrlTsk,
                                         "ctrl_tsk",
@@ -42,6 +44,7 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 
     pHndl->ctrl_rx = ctrl_rx;
     pHndl->ctrl_tx = ctrl_tx;
+    pHndl->col_rx = col_rx;
 
     return 0;
 }
@@ -59,6 +62,8 @@ void vCtrlTsk(void *pvParams) {
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    float p = 0, i = 0, d = 0, err, err_last = 0;
+
     for (;;) {
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->crsf, &rc);
@@ -68,6 +73,22 @@ void vCtrlTsk(void *pvParams) {
         pkt_rx.vel.y = normalize_crsf(rc.chan1);
         pkt_rx.vel.z = normalize_crsf(rc.chan0);
         pkt_rx.vel.w = normalize_crsf(rc.chan3);
+
+        quat_t qt;
+        if (xQueueReceive(pHndl->col_rx, &qt, 0) == pdTRUE) {
+            err = qt.z;
+            float derr = (err - err_last);
+            i += -err * 0.05f;
+            err_last = err;
+            p = 0.1f * err;
+            d = 0.1f * derr;
+            printf("CV: Y: %2.3f Z: %2.3f\n", qt.y, qt.z);
+        }
+        // pkt_rx.vel.z += (p - 0.32f);
+        // if (pkt_rx.vel.z < -1.0f)
+        //     pkt_rx.vel.z = -1.0f;
+        // if (pkt_rx.vel.z > 1.0f)
+        //     pkt_rx.vel.z = 1.0f;
 
         BaseType_t e;
         if (pHndl->ctrl_rx) {

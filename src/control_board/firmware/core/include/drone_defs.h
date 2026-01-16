@@ -13,11 +13,11 @@
 #define _DRONE_DEFS_H_
 
 // Generic struct to describe drone position/velocity
-typedef struct {
-    union {
+typedef union {
+    struct {
         float x, y, z, w;
-        float data[4];
     };
+    float data[4];
 } quat_t;
 
 #endif

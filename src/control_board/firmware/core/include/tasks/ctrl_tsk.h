@@ -39,11 +39,14 @@ struct ctrl_tsk {
 
     QueueHandle_t ctrl_tx;
     QueueHandle_t ctrl_rx;
+    QueueHandle_t col_rx;
 };
 
 extern int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                          Serial_t *pSerial,
                          QueueHandle_t ctrl_rx,
-                         QueueHandle_t ctrl_tx);
+                         QueueHandle_t ctrl_tx,
+                         QueueHandle_t col_rx
+                         );
 
 #endif
