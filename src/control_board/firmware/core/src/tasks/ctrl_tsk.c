@@ -57,39 +57,98 @@ float normalize_crsf(uint16_t raw) {
     return ((float) raw - 992.0f) / 819.5f;
 }
 
+float normalize_ctrl(float val) {
+    return (val + 1.0f) / 2.0f;
+}
+
+float unnormal_ctrl(float val) {
+    if (val < 0.0f) {
+        val = 0.0f;
+    }
+    if (val > 1.0f) {
+        val = 1.0f;
+    }
+    return (val * 2.0f) - 1.0f;
+}
+
+// rc channel 6 from the remote - top left toggle
+enum eCtrlMode {
+    eModeManual = 172,
+    eModeSemi = 992,
+    eModeAuto = 1809,
+};
+
 void vCtrlTsk(void *pvParams) {
     struct ctrl_tsk *pHndl = pvParams;
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
-    float p = 0, i = 0, d = 0, err, err_last = 0;
+    float err_last = 0;
+    float integral = 0;
+
+    const float psc_const = 0.05f;
+    const float p_const = 0.0020f;
+    const float a_const = 0.1000f;
+    const float g_const = 0.6000f;
+    const float i_const = 0.0035f;
+    const float d_const = 0.0020f;
+    const float f_const = 0.2819f;
+
+    float p = 0;
+    float i = 0;
+    float d = 0;
+    float err = 0;
 
     for (;;) {
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->crsf, &rc);
 
-        struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
-        pkt_rx.vel.x = normalize_crsf(rc.chan2);
-        pkt_rx.vel.y = normalize_crsf(rc.chan1);
-        pkt_rx.vel.z = normalize_crsf(rc.chan0);
-        pkt_rx.vel.w = normalize_crsf(rc.chan3);
+        float x = normalize_ctrl(normalize_crsf(rc.chan2));
+        float y = normalize_ctrl(normalize_crsf(rc.chan1));
+        float z = normalize_ctrl(normalize_crsf(rc.chan0));
+        float w = normalize_ctrl(normalize_crsf(rc.chan3));
 
         quat_t qt;
         if (xQueueReceive(pHndl->col_rx, &qt, 0) == pdTRUE) {
-            err = qt.z;
-            float derr = (err - err_last);
-            i += -err * 0.05f;
-            err_last = err;
-            p = 0.1f * err;
-            d = 0.1f * derr;
-            printf("CV: Y: %2.3f Z: %2.3f\n", qt.y, qt.z);
-        }
-        // pkt_rx.vel.z += (p - 0.32f);
-        // if (pkt_rx.vel.z < -1.0f)
-        //     pkt_rx.vel.z = -1.0f;
-        // if (pkt_rx.vel.z > 1.0f)
-        //     pkt_rx.vel.z = 1.0f;
+            float dt = ((float) xTaskGetTickCount() - (float) last_wake_time) /
+                       (float) configTICK_RATE_HZ;
+            if (dt <= 0.000001f) {
+                dt = 0.005f;
+            }
+            err = -qt.z * psc_const;
+            p = p_const * err;
+            float ip = err * (dt);
+            if (err < 0) {
+                // p = p * g_const;
+                ip = ip * g_const;
+            }
+            integral += ip * a_const;
+            integral = integral < 0.0f   ? 0.0f
+                       : integral > 1.0f ? 1.0f
+                                         : integral;
 
+            i = i_const * integral;
+            d = d_const * (err - err_last) / dt;
+            err_last = err;
+        }
+
+        // Apply PID inputs
+        if (rc.chan6 == eModeAuto) {
+            z = (p + i + d + f_const);
+        } else if (rc.chan6 == eModeSemi) {
+            float a = (z - 0.5f) * 0.05f;
+            z = f_const;
+            z += a;
+        } else {
+            integral = 0;
+        }
+        printf("Z: %2.5f P: %1.5f I: %1.5f -> %2.6f\n", err, p, i, z);
+
+        struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
+        pkt_rx.vel.x = unnormal_ctrl(x);
+        pkt_rx.vel.y = unnormal_ctrl(y);
+        pkt_rx.vel.z = unnormal_ctrl(z);
+        pkt_rx.vel.w = unnormal_ctrl(w);
         BaseType_t e;
         if (pHndl->ctrl_rx) {
             if ((e = xQueueGenericSend(
@@ -97,6 +156,6 @@ void vCtrlTsk(void *pvParams) {
             }
         }
 
-        vTaskDelayUntil(&last_wake_time, 5);
+        vTaskDelayUntil(&last_wake_time, 20);
     }
 }
