@@ -87,7 +87,7 @@ void vCtrlTsk(void *pvParams) {
     float integral = 0;
 
     const float psc_const = 0.05f;
-    const float p_const = 0.0020f;
+    const float p_const = 0.0042f;
     const float a_const = 0.1000f;
     const float g_const = 0.6000f;
     const float i_const = 0.0035f;
