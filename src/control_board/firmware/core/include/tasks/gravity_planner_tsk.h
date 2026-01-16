@@ -36,18 +36,14 @@ struct gplan_tsk {
     } tsk;
 
     // Output Queue
-    struct {
-        QueueHandle_t hndl;
-        StaticQueue_t static_queue;
-        quat_t buf[GPLAN_CVTX_BUF_SIZE];
-    } cv_tx;
+    struct ctrl_queue cv_tx;
 
     struct {
         QueueHandle_t rx, tx;
     } usb;
     
-    quat_t sums_front[UDEV_LIDAR_SEQ_MAX];
-    quat_t sums_vertical[UDEV_LIDAR_SEQ_MAX];
+    ctrl_vec_t sums_front[UDEV_LIDAR_SEQ_MAX];
+    ctrl_vec_t sums_vertical[UDEV_LIDAR_SEQ_MAX];
 };
 
 extern QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,

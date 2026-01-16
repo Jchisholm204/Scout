@@ -28,10 +28,7 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
     pHndl->usb.tx = usb_tx;
 
     // Setup the Collision Vector Output Queue
-    pHndl->cv_tx.hndl = xQueueCreateStatic(GPLAN_CVTX_BUF_SIZE,
-                                           sizeof(quat_t),
-                                           (uint8_t *) pHndl->cv_tx.buf,
-                                           &pHndl->cv_tx.static_queue);
+    xCtrlQueueCreateStatic(&pHndl->cv_tx);
 
     if (!pHndl->cv_tx.hndl) {
         return NULL;
@@ -143,15 +140,15 @@ void vGPlanTsk(void *pvParams) {
         // }
 
         // Calculate the collision vector
-        quat_t qv;
-        qv.x = 0;
-        qv.y = 0;
-        qv.z = 0;
-        qv.w = 0;
+        ctrl_state_t cs;
+        cs.cv.x = 0;
+        cs.cv.y = 0;
+        cs.cv.z = 0;
+        cs.cv.w = 0;
 
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             for (int j = 0; j < 4; j++) {
-                qv.data[j] += pHndl->sums_vertical[i].data[j];
+                cs.cv.data[j] += pHndl->sums_vertical[i].data[j];
                 // qv.data[j] += pHndl->sums_front[i].data[j];
             }
         }
@@ -172,7 +169,7 @@ void vGPlanTsk(void *pvParams) {
         // }
         // count++;
         // Send CV to control task
-        xQueueOverwrite(pHndl->cv_tx.hndl, &qv);
+        xQueueOverwrite(pHndl->cv_tx.hndl, &cs);
 
         // float sum_sqrt = 0;
         // for (int j = 0; j < 4; j++) {

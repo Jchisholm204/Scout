@@ -108,14 +108,14 @@ void vCtrlTsk(void *pvParams) {
         float z = normalize_ctrl(normalize_crsf(rc.chan0));
         float w = normalize_ctrl(normalize_crsf(rc.chan3));
 
-        quat_t qt;
-        if (xQueueReceive(pHndl->col_rx, &qt, 0) == pdTRUE) {
+        ctrl_state_t ct;
+        if (xQueueReceive(pHndl->col_rx, &ct, 0) == pdTRUE) {
             float dt = ((float) xTaskGetTickCount() - (float) last_wake_time) /
                        (float) configTICK_RATE_HZ;
             if (dt <= 0.000001f) {
                 dt = 0.005f;
             }
-            err = -qt.z * psc_const;
+            err = -ct.cv.z * psc_const;
             p = p_const * err;
             float ip = err * (dt);
             if (err < 0) {
