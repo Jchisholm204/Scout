@@ -18,6 +18,8 @@
 #include "queue.h"
 #include "semphr.h"
 #include "stream_buffer.h"
+#include "controllers/pid_controller.h"
+#include "controllers/antigravity.h"
 
 #include <stdio.h>
 
@@ -43,6 +45,10 @@ struct ctrl_tsk {
         QueueHandle_t tx;
         QueueHandle_t rx;
     } usb;
+
+    struct pid_controller pid_z;
+
+    struct antigravity_controller antigrav;
 
     QueueHandle_t col_rx;
 };

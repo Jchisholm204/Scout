@@ -50,29 +50,20 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     pHndl->usb.rx = usb_rx;
     pHndl->col_rx = col_rx;
 
+    const double p_const = 0.0042;
+    const double a_const = 0.1000;
+    // const double g_const = 0.6000;
+    const double i_const = 0.0035;
+    const double d_const = 0.0020;
+    const double f_const = 0.2819;
+
+    pidc_init(&pHndl->pid_z, p_const, i_const, d_const, 0, 0.5);
+    pidc_set_accel(&pHndl->pid_z, a_const);
+    pidc_set_ff(&pHndl->pid_z, f_const);
+
+    antigrav_init(&pHndl->antigrav, 0.05, 0.5);
+
     return 0;
-}
-
-float normalize_crsf(uint16_t raw) {
-    if (raw < CRSF_CHANNEL_MIN)
-        raw = CRSF_CHANNEL_MIN;
-    if (raw > CRSF_CHANNEL_MAX)
-        raw = CRSF_CHANNEL_MAX;
-    return ((float) raw - 992.0f) / 819.5f;
-}
-
-float normalize_ctrl(float val) {
-    return (val + 1.0f) / 2.0f;
-}
-
-float unnormal_ctrl(float val) {
-    if (val < 0.0f) {
-        val = 0.0f;
-    }
-    if (val > 1.0f) {
-        val = 1.0f;
-    }
-    return (val * 2.0f) - 1.0f;
 }
 
 // rc channel 6 from the remote - top left toggle
@@ -82,78 +73,61 @@ enum eCtrlMode {
     eModeAuto = 1809,
 };
 
-
 void vCtrlTsk(void *pvParams) {
     struct ctrl_tsk *pHndl = pvParams;
 
     TickType_t last_wake_time = xTaskGetTickCount();
-
-    float err_last = 0;
-    float integral = 0;
-
-    const float psc_const = 0.05f;
-    const float p_const = 0.0042f;
-    const float a_const = 0.1000f;
-    const float g_const = 0.6000f;
-    const float i_const = 0.0035f;
-    const float d_const = 0.0020f;
-    const float f_const = 0.2819f;
-
-    float p = 0;
-    float i = 0;
-    float d = 0;
-    float err = 0;
+    const double f_const = 0.2819;
+    const double psc_const = 0.05;
+    float pid_z = 0.0f;
 
     for (;;) {
+        // Handle Controller Input
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
 
-        float x = normalize_ctrl(normalize_crsf(rc.chan2));
-        float y = normalize_ctrl(normalize_crsf(rc.chan1));
-        float z = normalize_ctrl(normalize_crsf(rc.chan0));
-        float w = normalize_ctrl(normalize_crsf(rc.chan3));
+        float ct_x = crsf_normalize(rc.chan2);
+        float ct_y = crsf_normalize(rc.chan1);
+        float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
+        float ct_w = crsf_normalize(rc.chan3);
 
+        // Handle Lidar control input
         ctrl_state_t ct;
         if (xQueueReceive(pHndl->col_rx, &ct, 0) == pdTRUE) {
-            float dt = ((float) xTaskGetTickCount() - (float) last_wake_time) /
-                       (float) configTICK_RATE_HZ;
-            if (dt <= 0.000001f) {
-                dt = 0.005f;
+            double dt =
+                ((double) xTaskGetTickCount() - (double) last_wake_time) /
+                (double) configTICK_RATE_HZ;
+            if (dt <= 0.000001) {
+                dt = 0.005;
             }
-            err = -ct.cv.z * psc_const;
-            p = p_const * err;
-            float ip = err * (dt);
-            if (err < 0) {
-                // p = p * g_const;
-                ip = ip * g_const;
-            }
-            integral += ip * a_const;
-            integral = integral < 0.0f   ? 0.0f
-                       : integral > 1.0f ? 1.0f
-                                         : integral;
-
-            i = i_const * integral;
-            d = d_const * (err - err_last) / dt;
-            err_last = err;
+            pid_z = (float) pidc_calculate(
+                &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
         }
 
-        // Apply PID inputs
-        if (rc.chan6 == eModeAuto) {
-            z = (p + i + d + f_const);
-        } else if (rc.chan6 == eModeSemi) {
-            float a = (z - 0.5f) * 0.05f;
-            z = f_const;
-            z += a;
-        } else {
-            integral = 0;
+        // Mode Switch Case
+        switch ((enum eCtrlMode) rc.chan6) {
+        case eModeManual:
+            pidc_reset(&pHndl->pid_z);
+            break;
+        case eModeSemi:
+            ct_z = (float) f_const + (ct_z - 0.5f) * 0.05f;
+            break;
+        case eModeAuto:
+            ct_z = pid_z;
+            ct_x *= 0.25f;
+            ct_y *= 0.25f;
+            ct_w *= 0.25f;
+            break;
         }
-        printf("Z: %2.5f P: %1.5f I: %1.5f -> %2.6f\n", err, p, i, z);
 
+        // printf("Z: %2.5f P: %1.5f I: %1.5f -> %2.6f\n", err, p, i, z);
+
+        // Send out control outputs
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
-        pkt_rx.vel.x = unnormal_ctrl(x);
-        pkt_rx.vel.y = unnormal_ctrl(y);
-        pkt_rx.vel.z = unnormal_ctrl(z);
-        pkt_rx.vel.w = unnormal_ctrl(w);
+        pkt_rx.vel.x = ct_x;
+        pkt_rx.vel.y = ct_y;
+        pkt_rx.vel.z = ((ct_z * 2.0f) - 1.0f);
+        pkt_rx.vel.w = ct_w;
         (void) xQueueGenericSend(pHndl->usb.rx, &pkt_rx, 1, queueOVERWRITE);
 
         vTaskDelayUntil(&last_wake_time, 20);
