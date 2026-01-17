@@ -102,6 +102,10 @@ void vCtrlTsk(void *pvParams) {
             }
             pid_z = (float) pidc_calculate(
                 &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
+            printf("Z: %3.3f C: %2.2f G: %2.2f\n",
+                   ct.cv.z,
+                   ct.ceil_distance,
+                   ct.ground_distance);
         }
 
         // Mode Switch Case
@@ -119,8 +123,6 @@ void vCtrlTsk(void *pvParams) {
             ct_w *= 0.25f;
             break;
         }
-
-        // printf("Z: %2.5f P: %1.5f I: %1.5f -> %2.6f\n", err, p, i, z);
 
         // Send out control outputs
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
