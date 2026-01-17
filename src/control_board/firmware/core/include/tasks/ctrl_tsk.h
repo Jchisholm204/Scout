@@ -47,6 +47,8 @@ struct ctrl_tsk {
     } usb;
 
     struct pid_controller pid_z;
+    struct pid_controller pid_x;
+    struct pid_controller pid_y;
 
     struct antigravity_controller antigrav;
 

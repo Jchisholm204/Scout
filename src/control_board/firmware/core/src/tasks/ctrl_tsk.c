@@ -61,6 +61,11 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     pidc_set_accel(&pHndl->pid_z, a_const);
     pidc_set_ff(&pHndl->pid_z, f_const);
 
+    const double p_xy = 0.00180;
+    const double d_xy = 0.00025;
+    pidc_init(&pHndl->pid_x, p_xy, 0, d_xy, -0.15, 0.15);
+    pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
+
     antigrav_init(&pHndl->antigrav, 0.05, 0.5);
 
     return 0;
@@ -81,6 +86,9 @@ void vCtrlTsk(void *pvParams) {
     const double psc_const = 0.05;
     float pid_z = 0.0f;
 
+    float pid_x = 0;
+    float pid_y = 0;
+
     for (;;) {
         // Handle Controller Input
         crsf_rc_t rc;
@@ -88,6 +96,7 @@ void vCtrlTsk(void *pvParams) {
 
         float ct_x = crsf_normalize(rc.chan2);
         float ct_y = crsf_normalize(rc.chan1);
+        // Normalize the throttle to a percentatge value
         float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
         float ct_w = crsf_normalize(rc.chan3);
 
@@ -102,10 +111,11 @@ void vCtrlTsk(void *pvParams) {
             }
             pid_z = (float) pidc_calculate(
                 &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
-            printf("Z: %3.3f C: %2.2f G: %2.2f\n",
-                   ct.cv.z,
-                   ct.ceil_distance,
-                   ct.ground_distance);
+            pid_x = (float) pidc_calculate(
+                &pHndl->pid_x, 0, (double) -ct.cv.x, dt);
+            pid_y = (float) pidc_calculate(
+                &pHndl->pid_y, 0, (double) ct.cv.y, dt);
+            printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
         }
 
         // Mode Switch Case
@@ -118,9 +128,11 @@ void vCtrlTsk(void *pvParams) {
             break;
         case eModeAuto:
             ct_z = pid_z;
-            ct_x *= 0.25f;
-            ct_y *= 0.25f;
-            ct_w *= 0.25f;
+            ct_x *= 0.5f;
+            ct_y *= 0.5f;
+            ct_w *= 0.5f;
+            ct_x += pid_x;
+            ct_y += pid_y;
             break;
         }
 
