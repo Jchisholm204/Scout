@@ -60,9 +60,10 @@ void vTsk_testOnline(void *pvParams) {
     vTaskDelay(pHndl->delay_ticks);
     TickType_t last_wake_time = xTaskGetTickCount();
     for (;;) {
-        leds ^= 0x3U;
+        leds ^= 0x7U;
         gpio_write(PIN_LED1, leds & 0x1U);
         gpio_write(PIN_LED2, leds & 0x2U);
+        gpio_write(PIN_LED3, leds & 0x4U);
         struct systime t;
         systime_fromTicks(xTaskGetTickCount(), &t);
         printf("Time: %s\n", t.str);

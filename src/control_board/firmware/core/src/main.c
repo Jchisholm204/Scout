@@ -90,7 +90,7 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    rplidar_init(&rplidar_tsk, Serial3, PIN_USART3_TX, PIN_USART3_RX);
+    rplidar_init(&rplidar_tsk, Serial3, PIN_UART5_TX, PIN_UART5_RX);
     
 #endif
 
