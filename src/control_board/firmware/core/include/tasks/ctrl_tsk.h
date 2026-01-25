@@ -18,32 +18,47 @@
 #include "queue.h"
 #include "semphr.h"
 #include "stream_buffer.h"
+#include "controllers/pid_controller.h"
+#include "controllers/antigravity.h"
 
 #include <stdio.h>
 
 #define CTRL_TSK_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
 
 struct ctrl_tsk {
-    Serial_t *pSerial;
-    CRSF_t crsf;
+    struct {
+        CRSF_t crsf;
+        // Recieve Buffer (from serial driver interrupt)
+        StreamBufferHandle_t buf_hndl;
+        StaticStreamBuffer_t stream_buffer;
+        uint8_t storage_area[configMINIMAL_STACK_SIZE];
+    } rc_crsf;
 
     // Task information
-    TaskHandle_t tsk_hndl;
-    StaticTask_t tsk_buf;
-    StackType_t tsk_stack[CTRL_TSK_STACK_SIZE];
+    struct {
+        TaskHandle_t hndl;
+        StaticTask_t static_task;
+        StackType_t stack[CTRL_TSK_STACK_SIZE];
+    } tsk;
 
-    // Recieve Buffer (from serial driver interrupt)
-    StreamBufferHandle_t tx_hndl;
-    StaticStreamBuffer_t tx_streamBuf;
-    uint8_t tx_buf[configMINIMAL_STACK_SIZE];
+    struct {
+        QueueHandle_t tx;
+        QueueHandle_t rx;
+    } usb;
 
-    QueueHandle_t ctrl_tx;
-    QueueHandle_t ctrl_rx;
+    struct pid_controller pid_z;
+    struct pid_controller pid_x;
+    struct pid_controller pid_y;
+
+    struct antigravity_controller antigrav;
+
+    QueueHandle_t col_rx;
 };
 
 extern int ctrl_tsk_init(struct ctrl_tsk *pHndl,
-                         Serial_t *pSerial,
-                         QueueHandle_t ctrl_rx,
-                         QueueHandle_t ctrl_tx);
+                         Serial_t *rc_serial,
+                         QueueHandle_t usb_rx,
+                         QueueHandle_t usb_tx,
+                         QueueHandle_t col_rx);
 
 #endif

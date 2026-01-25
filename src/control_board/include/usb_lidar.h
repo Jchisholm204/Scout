@@ -16,7 +16,7 @@
 #include "usb_cb_defs.h"
 #include "usb_packet.h"
 
-#define UDEV_LIDAR_SEQ_STEP ((float) (3.1415926535f / (int) UDEV_LIDAR_SEQ_MAX))
+#define UDEV_LIDAR_SEQ_STEP ((float) ((2.0f * 3.1415926535f) / (int) UDEV_LIDAR_SEQ_MAX))
 #define UDEV_LIDAR_ITER_STEP ((float) (UDEV_LIDAR_SEQ_STEP / (int) UDEV_LIDAR_POINTS))
 
 struct udev_lidar {
@@ -100,7 +100,7 @@ static inline int udev_lidar_recv(struct udev_lidar* pHndl, struct udev_pkt_lida
         return -3;
     }
     pHndl->most_recent = pkt->hdr.sequence;
-    memcpy(&pHndl->data[pkt->hdr.sequence], pkt, sizeof(udev_pkt_lidar));
+    memcpy(&pHndl->data[pkt->hdr.sequence], pkt, sizeof(struct udev_pkt_lidar));
     return 0;
 }
 

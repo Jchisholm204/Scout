@@ -60,4 +60,21 @@ def generate_launch_description():
             output='screen',
             arguments=['-d', './rviz_sim.rviz']
         ),
+        # Launch the simulation interfaces
+        Node(
+            package='simulation',
+            executable='control',
+            name='sim_ctrl',
+            ),
+        Node(
+            package='simulation',
+            executable='lidarstreams',
+            name='sim_lidar',
+            ),
+        # Launch the driver board interface
+        Node(
+            package='control_board',
+            executable='driver',
+            name='cb_interface',
+            ),
     ])
