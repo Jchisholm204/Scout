@@ -35,13 +35,11 @@ RpLidar_t rplidar_tsk;
 
 // Task Includes
 #include "tasks/ctrl_tsk.h"
-#include "tasks/gravity_planner_tsk.h"
 #include "tasks/sim_lidar_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
-struct gplan_tsk gplan_tsk;
 struct sim_lidar_tsk sim_lidar_tsk;
 struct test_tsk test_tsk;
 
@@ -50,10 +48,10 @@ void Init(void) {
     // Initialize System Clock
     hal_clock_init();
 
+#if defined(BOARD_NUCLEOZE)
     // Init USB Interface
     struct usbi *usbi = usbi_init();
 
-#if defined(BOARD_NUCLEOZE)
     // Initialize UART
     Serial_t *Serial3 =
         serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);

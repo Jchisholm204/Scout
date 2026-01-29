@@ -13,6 +13,19 @@
 #include "os/systime.h"
 #include "string.h"
 
+void parse_RpLidarResponseDescriptor(RpLidarResponseDescriptor *rd, uint8_t *bytes) {
+    rd->start_flag1 = bytes[0];
+    rd->start_flag2 = bytes[1];
+    rd->data_response_length = bytes[2] | (bytes[3] << 8) | (bytes[4] << 16) | ((bytes[5] & 0xCU) << 24);
+    rd->send_mode = (bytes[5] & 0x3U);
+    rd->data_type = bytes[6];
+}
+void parse_RpLidarDeviceInfo(RpLidarDeviceInfo *di, uint8_t *bytes) {
+    di->major_model = (bytes[0]) >> 4;
+    di->sub_model = bytes[0] & 0x0F;
+    memcpy(&(di->firmware_minor), bytes+1, sizeof(RpLidarDeviceInfo)-2);
+}
+
 void vRpLidar_tsk(void* pvParams);
 
 eRpLidarError rplidar_init(RpLidar_t* pHndl,
@@ -118,16 +131,59 @@ void vRpLidar_tsk(void* pvParams){
     printf("GET_INFO response descriptor: %X %X %X %X %X %X %X\n", response[0], response[1], response[2], response[3], response[4], response[5], response[6]);
 
     RpLidarResponseDescriptor get_info_response_descriptor;
-    memcpy(&get_info_response_descriptor, response, sizeof(RpLidarResponseDescriptor));
-    // TODO: print stuff from get_info_response_descriptor to make sure we are parsing correctly
+    parse_RpLidarResponseDescriptor(&get_info_response_descriptor, response);
+    // print stuff from get_info_response_descriptor to make sure we are parsing correctly
+    printf("get_info_response_descriptor:\n");
+    printf("    start_flag1: %X\n", get_info_response_descriptor.start_flag1);
+    printf("    start_flag2: %X\n", get_info_response_descriptor.start_flag2);
+    printf("    data_response_length: %lu\n", get_info_response_descriptor.data_response_length);
+    printf("    send_mode: %X\n", get_info_response_descriptor.send_mode);
+    printf("    data_type: %X\n", get_info_response_descriptor.data_type);
 
-    uint32_t data_response_length = get_info_response_descriptor.data_response_detail & 0xFFFFFFFC;
+    uint32_t data_response_length = get_info_response_descriptor.data_response_length & 0xFFFFFFFC;
+    printf("reading %lu bytes from Serial3:\n", data_response_length);
     for (uint32_t i = 0; i < data_response_length;) {
         if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
             printf("byte %lu: %X\n", i, response[i]);
             i++;
         }
     }
+    
+    RpLidarDeviceInfo device_info;
+    parse_RpLidarDeviceInfo(&device_info, response);
+
+// typedef struct {
+//     uint8_t major_model;
+//     uint8_t sub_model;
+//     uint8_t firmware_minor;
+//     uint8_t firmware_major;
+//     uint8_t hardware;
+//     uint8_t serialnumber[16];
+// } RpLidarDeviceInfo;
+    printf("device_info:\n");
+    printf("    major_model: %X\n", device_info.major_model);
+    printf("    sub_model: %X\n", device_info.sub_model);
+    printf("    firmware_minor: %X\n", device_info.firmware_minor);
+    printf("    firmware_major: %X\n", device_info.firmware_major);
+    printf("    hardware: %X\n", device_info.hardware);
+    printf("    serialnumber: %X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X\n",
+         device_info.serialnumber[0], 
+         device_info.serialnumber[1], 
+         device_info.serialnumber[2],
+         device_info.serialnumber[3],
+         device_info.serialnumber[4],
+         device_info.serialnumber[5],
+         device_info.serialnumber[6],
+         device_info.serialnumber[7],
+         device_info.serialnumber[8],
+         device_info.serialnumber[9],
+         device_info.serialnumber[10],
+         device_info.serialnumber[11],
+         device_info.serialnumber[12],
+         device_info.serialnumber[13],
+         device_info.serialnumber[14],
+         device_info.serialnumber[15]
+        );
 
     // send a GET_HEALTH request
     // wait
