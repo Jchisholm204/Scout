@@ -71,11 +71,9 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    // QueueHandle_t slqh =
-    //     gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    CtrlQueueHndl_t slqh =
-        sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+    QueueHandle_t cv_qh =
+        gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx);
 #elif defined(BOARD_ARMV1)
     // Initialize UART
     Serial_t *Serial5 =
