@@ -4,3 +4,6 @@
 [submodule "src/interfaces/rplidar_bridge/rplidar_sdk"]
 	path = src/interfaces/rplidar_bridge/rplidar_sdk
 	url = https://github.com/Slamtec/rplidar_sdk.git
+[submodule "PCB_Scout"]
+	path = PCB_Scout
+	url = https://github.com/jacquieg81/PCB_Scout.git
