@@ -20,9 +20,11 @@
 
 ControlNode::ControlNode() : Node("sim_control") {
     RCLCPP_INFO(this->get_logger(), "Liftoff Control Node Online");
+    this->declare_parameter("ctrl_topic", "cb/out/vel");
+    std::string ctrl_topic = this->get_parameter("ctrl_topic").as_string();
     joystick_init(&_joy);
     _vel_cmd_sub = this->create_subscription<geometry_msgs::msg::Quaternion>(
-        "cb/out/vel", 10,
+        ctrl_topic, 10,
         std::bind(&ControlNode::_vel_cmd_callback, this, std::placeholders::_1));
 }
 

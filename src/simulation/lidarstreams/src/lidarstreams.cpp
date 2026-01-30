@@ -19,24 +19,18 @@
 #include <string.h>
 
 LidarStreams::LidarStreams() : Node("lidarstreams") {
-    this->declare_parameter("lidar_baud", 460800);
     this->declare_parameter("lidar_front_name", "lidar_front_frame");
     this->declare_parameter("lidar_vertical_name", "lidar_vertical_frame");
     this->declare_parameter("pub_rate", 50);
-    this->declare_parameter("lidar_mode", 0);
 
     std::string lidar_front_name = this->get_parameter("lidar_front_name").as_string();
     std::string lidar_vertical_name =
         this->get_parameter("lidar_vertical_name").as_string();
     int64_t pub_rate = this->get_parameter("pub_rate").as_int();
-    int64_t lidar_mode = this->get_parameter("lidar_mode").as_int();
 
     // Sanitize Parameters
     if (pub_rate < 0) {
         throw std::runtime_error("Publish Rate must be greater than 0");
-    }
-    if (lidar_mode < 0) {
-        throw std::runtime_error("lidar_mode must be greater than 0");
     }
 
     // Initialize LiDAR UDP Stream

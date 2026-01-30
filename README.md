@@ -7,7 +7,7 @@ This is accomplished using a combination of SLAM and low level control algorithm
 ## Repo Organization
 The base level of this repo is designed to follow the format of a ROS2 Project.
 All code is encapsulated within ROS nodes within the [`src`](./src) folder.
-Documentation can found under [`docs`](./docs).
+Project documentation can found under [`docs`](./docs), while most other docs are placed with the code they are documenting.
 Scripts, including build and launch scripts, can be found under [`scripts`](./scripts), while Python Launch files can be found under [`launch`](./launch).
 Finally, the PCB design is available under [`PCB_Scout`](./PCB_Scout), and embedded code is placed under [`src/control_board`](./src/control_board/firmware)
 
