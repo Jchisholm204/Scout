@@ -24,3 +24,4 @@ Exceptions to the above exist when the UAV is performing an action that requires
 ### Telemetry and Radio Communication
 The UAV must be able to operate without the usage of any radio signals communicating with external hardware including but not limited to: GNSS signals, Base Station links, or wireless controller inputs.
 
+
