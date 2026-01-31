@@ -40,3 +40,4 @@ The headers are organized from top to bottom in terms of information flow within
 - Receives stick commands over MSP or CSRF from the CIB
 - Handles low level flight kinematics/control
 - Interfaces with the ESC (DSHOT or Bidirectional DSHOT)
+
