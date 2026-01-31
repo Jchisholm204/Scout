@@ -25,6 +25,7 @@
 
 #define CTRL_TSK_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
 
+
 struct ctrl_tsk {
     struct {
         CRSF_t crsf;

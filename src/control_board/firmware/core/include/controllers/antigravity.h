@@ -31,7 +31,10 @@ static inline void antigrav_init(struct antigravity_controller *pHndl,
     pHndl->last.ground_distance = 0.0;
 }
 
-static inline ctrl_state_t antigravity_run(struct antigravity_controller *pHndl,
+static inline void antigrav_reset(struct antigravity_controller *pHndl) {
+}
+
+static inline ctrl_state_t antigrav_run(struct antigravity_controller *pHndl,
                                            ctrl_state_t *pCs) {
 }
 

@@ -67,6 +67,17 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     pHndl->usb.rx = usb_rx;
     pHndl->col_rx = col_rx;
 
+    return 0;
+}
+
+// rc channel 6 from the remote - top left toggle
+enum eCtrlMode {
+    eModeManual = 172,
+    eModeSemi = 992,
+    eModeAuto = 1809,
+};
+
+int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     const double p_const = 0.0042;
     const double a_const = 0.1000;
     // const double g_const = 0.6000;
@@ -84,19 +95,25 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
 
     antigrav_init(&pHndl->antigrav, 0.05, 0.5);
-
     return 0;
 }
 
-// rc channel 6 from the remote - top left toggle
-enum eCtrlMode {
-    eModeManual = 172,
-    eModeSemi = 992,
-    eModeAuto = 1809,
-};
+int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
+    // Reset the PID controllers
+    pidc_reset(&pHndl->pid_z);
+    pidc_reset(&pHndl->pid_x);
+    pidc_reset(&pHndl->pid_y);
+
+    // Reset the antigravity controller
+    antigrav_reset(&pHndl->antigrav);
+    return 0;
+}
 
 void vCtrlTsk(void *pvParams) {
-    struct ctrl_tsk *pHndl = pvParams;
+    struct ctrl_tsk *const pHndl = pvParams;
+
+    // Run the setup functions for each of the controllers.
+    ctrl_setup_controllers(pHndl);
 
     TickType_t last_wake_time = xTaskGetTickCount();
     const double f_const = 0.2819;
