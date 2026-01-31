@@ -123,9 +123,6 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
     crsf_rc_t rc;
     crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
     crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
-    crsf_battery_t bat;
-    crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
-    crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
     float ct_x = crsf_normalize(rc.chan2);
     float ct_y = crsf_normalize(rc.chan1);
@@ -164,6 +161,8 @@ ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
 
     ctrl_vec_t cv = {0};
 
+    ctrl_state_t target_state = {0};
+
     return cv;
 }
 
@@ -174,51 +173,67 @@ void vCtrlTsk(void *pvParams) {
     ctrl_setup_controllers(pHndl);
 
     TickType_t last_wake_time = xTaskGetTickCount();
-    const double f_const = 0.2819;
-    const double psc_const = 0.05;
-    float pid_z = 0.0f;
 
-    float pid_x = 0;
-    float pid_y = 0;
+    enum eCtrlMode current_mode = eModeManual;
+    enum eCtrlMode target_mode = eModeManual;
 
     for (;;) {
-        // Handle Controller Input
+        // Ensure a consistent sample time delay
+        vTaskDelayUntil(&last_wake_time, 20);
+
+        // Read input data from the controller (primary source of truth)
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
-        crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
+
+        // Transmit latest drone updates to the controller
         crsf_battery_t bat;
         crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
-        float ct_x = crsf_normalize(rc.chan2);
-        float ct_y = crsf_normalize(rc.chan1);
-        // Normalize the throttle to a percentatge value
-        float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
-        float ct_w = crsf_normalize(rc.chan3);
+        // Decode operating parameters selections
+        current_mode = rc.chan6;
 
-        ctrl_state_t target_state = {0};
+        // Read input data from the Jetson
+        ctrl_vec_t cv_jetson = {0};
+        // xQueueReceive
+        // Switch to semi automatic if jetson fails
+        if (!pdTRUE) {
+            // Log the current mode as the perfered mode
+            target_mode = current_mode;
+            current_mode = eModeSemi;
+        } else {
+            // Handle High level Mode Change Requests
 
-        // Mode Switch Case
-        switch ((enum eCtrlMode) rc.chan6) {
+            // Switch back to the prefered mode
+            current_mode = target_mode;
+        }
+
+        // Run controllers to get output control vector
+        ctrl_vec_t cv_final = {0};
+        switch (current_mode) {
         case eModeManual:
-            ctrl_run_manual(pHndl, &target_state);
+            ctrl_run_manual(pHndl);
             break;
         case eModeSemi:
-            ctrl_run_(pHndl, &target_state);
-            ctrl_run_manual(pHndl, &target_state);
+            ctrl_vec_combine(ctrl_run_controllers(pHndl),
+                             ctrl_run_manual(pHndl),
+                             0.5);
             break;
         case eModeAuto:
+            ctrl_vec_combine(ctrl_run_controllers(pHndl), cv_jetson, 0.5);
             break;
         }
 
         // Send out control outputs
+
+        // USB Control Output
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
-        pkt_rx.vel.x = ct_x;
-        pkt_rx.vel.y = ct_y;
-        pkt_rx.vel.z = ((ct_z * 2.0f) - 1.0f);
-        pkt_rx.vel.w = ct_w;
+        for (int i = 0; i < 4; i++)
+            pkt_rx.vel.data[i] = cv_final.data[i];
         (void) xQueueGenericSend(pHndl->usb.rx, &pkt_rx, 1, queueOVERWRITE);
 
-        vTaskDelayUntil(&last_wake_time, 20);
+        // CRSF Output to Flight Controller
+        crsf_rc_t fc_out = {0};
+
     }
 }

@@ -49,4 +49,18 @@ static inline CtrlQueueHndl_t xCtrlQueueCreateStatic(struct ctrl_queue *cq) {
     return cq->hndl;
 }
 
+static inline ctrl_vec_t ctrl_vec_combine(ctrl_vec_t A,
+                                          ctrl_vec_t B,
+                                          float weight) {
+    if (weight < -1)
+        weight = -1;
+    if (weight > 1)
+        weight = 1;
+    ctrl_vec_t C;
+    for (int i = 0; i < 4; i++) {
+        C.data[i] = (A.data[i] * weight) + (B.data[i] * (1 - weight));
+    }
+    return C;
+}
+
 #endif
