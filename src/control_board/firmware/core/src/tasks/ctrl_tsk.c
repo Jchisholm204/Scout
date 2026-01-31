@@ -13,6 +13,7 @@
 
 #include "drone_defs.h"
 #include "queue.h"
+#include "usb_cb_defs.h"
 #include "usb_packet.h"
 
 void vCtrlTsk(void *pvParams);
@@ -69,13 +70,6 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 
     return 0;
 }
-
-// rc channel 6 from the remote - top left toggle
-enum eCtrlMode {
-    eModeManual = 172,
-    eModeSemi = 992,
-    eModeAuto = 1809,
-};
 
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     const double p_const = 0.0042;
@@ -160,8 +154,14 @@ ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
     (void) pHndl;
 
     ctrl_vec_t cv = {0};
+    crsf_rc_t rc;
+    crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
 
-    ctrl_state_t target_state = {0};
+    // TAER Mapping
+    cv.x = crsf_normalize(rc.chan2);
+    cv.y = crsf_normalize(rc.chan1);
+    cv.z = crsf_normalize(rc.chan0);
+    cv.w = crsf_normalize(rc.chan3);
 
     return cv;
 }
@@ -174,8 +174,8 @@ void vCtrlTsk(void *pvParams) {
 
     TickType_t last_wake_time = xTaskGetTickCount();
 
-    enum eCtrlMode current_mode = eModeManual;
-    enum eCtrlMode target_mode = eModeManual;
+    enum eCBMode current_mode = eModeRC;
+    enum eCBMode target_mode = eModeRC;
 
     for (;;) {
         // Ensure a consistent sample time delay
@@ -191,7 +191,20 @@ void vCtrlTsk(void *pvParams) {
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
         // Decode operating parameters selections
-        current_mode = rc.chan6;
+        switch (rc.chan6) {
+        case CRSF_CHANNEL_MIN:
+            current_mode = eModeRC;
+            break;
+        case CRSF_CHANNEL_ZERO:
+            current_mode = eModeRCAuto;
+            break;
+        case CRSF_CHANNEL_MAX:
+            current_mode = eModeAuto;
+            break;
+        default:
+            current_mode = eModeDisabled;
+            break;
+        }
 
         // Read input data from the Jetson
         ctrl_vec_t cv_jetson = {0};
@@ -200,7 +213,7 @@ void vCtrlTsk(void *pvParams) {
         if (!pdTRUE) {
             // Log the current mode as the perfered mode
             target_mode = current_mode;
-            current_mode = eModeSemi;
+            current_mode = eModeStalled;
         } else {
             // Handle High level Mode Change Requests
 
@@ -211,16 +224,22 @@ void vCtrlTsk(void *pvParams) {
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
         switch (current_mode) {
-        case eModeManual:
-            ctrl_run_manual(pHndl);
+        case eModeDisabled:
+        case eModeInit:
+        case eModeRC:
+            cv_final = ctrl_run_manual(pHndl);
             break;
-        case eModeSemi:
-            ctrl_vec_combine(ctrl_run_controllers(pHndl),
-                             ctrl_run_manual(pHndl),
-                             0.5);
+        case eModeStalled:
+        case eModeRCAuto:
+            cv_final = ctrl_vec_combine(ctrl_run_controllers(pHndl),
+                                        ctrl_run_manual(pHndl),
+                                        0.5);
             break;
         case eModeAuto:
-            ctrl_vec_combine(ctrl_run_controllers(pHndl), cv_jetson, 0.5);
+            cv_final =
+                ctrl_vec_combine(ctrl_run_controllers(pHndl), cv_jetson, 0.5);
+            break;
+        case eModeFault:
             break;
         }
 
@@ -234,6 +253,12 @@ void vCtrlTsk(void *pvParams) {
 
         // CRSF Output to Flight Controller
         crsf_rc_t fc_out = {0};
-
+        // AETR Mappings
+        fc_out.chan0 = crsf_unnormal(cv_final.x);
+        fc_out.chan1 = crsf_unnormal(cv_final.y);
+        fc_out.chan2 = crsf_unnormal(cv_final.z);
+        fc_out.chan3 = crsf_unnormal(cv_final.w);
+        fc_out.chan4 = rc.chan4;
+        crsf_write_rc(&pHndl->fc_crsf.crsf, &fc_out);
     }
 }
