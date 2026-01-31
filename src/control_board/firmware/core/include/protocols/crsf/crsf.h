@@ -99,4 +99,12 @@ static inline float crsf_normalize(uint16_t raw){
     return ((float) raw - 992.0f) / 819.5f;
 }
 
+static inline uint16_t crsf_unnormal(float value){
+    if (value < -1)
+        value = -1;
+    if (value > 1)
+        value = 1;
+    return (uint16_t)((value*819.5f) + 992.0f);
+}
+
 #endif

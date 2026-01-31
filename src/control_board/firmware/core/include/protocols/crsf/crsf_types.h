@@ -21,7 +21,7 @@
 
 #define CRSF_CHANNEL_MIN 172
 #define CRSF_CHANNEL_ZERO 992
-#define CRSF_CHANNEL_MAX 1811
+#define CRSF_CHANNEL_MAX 1809
 
 enum eCRSFDataType {
     UINT8 = 0,
