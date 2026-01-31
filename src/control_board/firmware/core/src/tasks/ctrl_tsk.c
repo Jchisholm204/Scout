@@ -109,6 +109,64 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
     return 0;
 }
 
+ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
+    (void) pHndl;
+    TickType_t last_wake_time = xTaskGetTickCount();
+    const double f_const = 0.2819;
+    const double psc_const = 0.05;
+    float pid_z = 0.0f;
+
+    float pid_x = 0;
+    float pid_y = 0;
+
+    // Handle Controller Input
+    crsf_rc_t rc;
+    crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
+    crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
+    crsf_battery_t bat;
+    crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
+    crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
+
+    float ct_x = crsf_normalize(rc.chan2);
+    float ct_y = crsf_normalize(rc.chan1);
+    // Normalize the throttle to a percentatge value
+    float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
+    float ct_w = crsf_normalize(rc.chan3);
+
+    // Handle Lidar control input
+    ctrl_state_t ct;
+    if (xQueueReceive(pHndl->col_rx, &ct, 0) == pdTRUE) {
+        double dt = ((double) xTaskGetTickCount() - (double) last_wake_time) /
+                    (double) configTICK_RATE_HZ;
+        if (dt <= 0.000001) {
+            dt = 0.005;
+        }
+        pid_z = (float) pidc_calculate(
+            &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
+        pid_x = (float) pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
+        pid_y = (float) pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
+        // printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
+    }
+
+    ctrl_vec_t ctrl_v;
+    ctrl_v.z = pid_z;
+    ctrl_v.x *= 0.5f;
+    ctrl_v.y *= 0.5f;
+    ctrl_v.w *= 0.5f;
+    ctrl_v.x += pid_x;
+    ctrl_v.y += pid_y;
+
+    return ctrl_v;
+}
+
+ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
+    (void) pHndl;
+
+    ctrl_vec_t cv = {0};
+
+    return cv;
+}
+
 void vCtrlTsk(void *pvParams) {
     struct ctrl_tsk *const pHndl = pvParams;
 
@@ -138,39 +196,18 @@ void vCtrlTsk(void *pvParams) {
         float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
         float ct_w = crsf_normalize(rc.chan3);
 
-        // Handle Lidar control input
-        ctrl_state_t ct;
-        if (xQueueReceive(pHndl->col_rx, &ct, 0) == pdTRUE) {
-            double dt =
-                ((double) xTaskGetTickCount() - (double) last_wake_time) /
-                (double) configTICK_RATE_HZ;
-            if (dt <= 0.000001) {
-                dt = 0.005;
-            }
-            pid_z = (float) pidc_calculate(
-                &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
-            pid_x =
-                (float) pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
-            pid_y =
-                (float) pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
-            // printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
-        }
+        ctrl_state_t target_state = {0};
 
         // Mode Switch Case
         switch ((enum eCtrlMode) rc.chan6) {
         case eModeManual:
-            pidc_reset(&pHndl->pid_z);
+            ctrl_run_manual(pHndl, &target_state);
             break;
         case eModeSemi:
-            ct_z = (float) f_const + (ct_z - 0.5f) * 0.05f;
+            ctrl_run_(pHndl, &target_state);
+            ctrl_run_manual(pHndl, &target_state);
             break;
         case eModeAuto:
-            ct_z = pid_z;
-            ct_x *= 0.5f;
-            ct_y *= 0.5f;
-            ct_w *= 0.5f;
-            ct_x += pid_x;
-            ct_y += pid_y;
             break;
         }
 
