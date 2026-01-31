@@ -15,6 +15,9 @@
 #include "protocols/crsf/crsf_types.h"
 #include "protocols/crsf/crsf_types_internal.h"
 
+#define LIMIT(min, val, max)                                                   \
+    ((val) < (min) ? (min) : ((val) > (max) ? (max) : (val)))
+
 extern uint8_t _crsf_crc8(const uint8_t *ptr, uint8_t len);
 
 eCRSFError _crsf_send_packet(CRSF_t *pHndl,
@@ -44,35 +47,73 @@ eCRSFError _crsf_send_packet(CRSF_t *pHndl,
     return eCRSFOK;
 }
 
-eCRSFError crsf_write_rc(CRSF_t *pHndl, crsf_rc_t *pChannels) {
+eCRSFError crsf_write_rc(CRSF_t *pHndl, const crsf_rc_t *pChannels) {
     if (!pHndl || !pChannels) {
         return eCRSFNULL;
     }
     _crsf_msg_t msg;
-    msg.rc.chan0 = pChannels->chan0;
-    msg.rc.chan1 = pChannels->chan1;
-    msg.rc.chan2 = pChannels->chan2;
-    msg.rc.chan3 = pChannels->chan3;
-    msg.rc.chan4 = pChannels->chan4;
-    msg.rc.chan5 = pChannels->chan5;
-    msg.rc.chan6 = pChannels->chan6;
-    msg.rc.chan7 = pChannels->chan7;
-    msg.rc.chan8 = pChannels->chan8;
-    msg.rc.chan9 = pChannels->chan9;
-    msg.rc.chan10 = pChannels->chan10;
-    msg.rc.chan11 = pChannels->chan11;
-    msg.rc.chan12 = pChannels->chan12;
-    msg.rc.chan13 = pChannels->chan13;
-    msg.rc.chan14 = pChannels->chan14;
-    msg.rc.chan15 = pChannels->chan15;
+    msg.rc.chan0 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan0, CRSF_CHANNEL_MAX);
+    msg.rc.chan1 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan1, CRSF_CHANNEL_MAX);
+    msg.rc.chan2 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan2, CRSF_CHANNEL_MAX);
+    msg.rc.chan3 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan3, CRSF_CHANNEL_MAX);
+    msg.rc.chan4 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan4, CRSF_CHANNEL_MAX);
+    msg.rc.chan5 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan5, CRSF_CHANNEL_MAX);
+    msg.rc.chan6 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan6, CRSF_CHANNEL_MAX);
+    msg.rc.chan7 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan7, CRSF_CHANNEL_MAX);
+    msg.rc.chan8 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan8, CRSF_CHANNEL_MAX);
+    msg.rc.chan9 = LIMIT(CRSF_CHANNEL_MIN, pChannels->chan9, CRSF_CHANNEL_MAX);
+    msg.rc.chan10 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan10, CRSF_CHANNEL_MAX);
+    msg.rc.chan11 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan11, CRSF_CHANNEL_MAX);
+    msg.rc.chan12 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan12, CRSF_CHANNEL_MAX);
+    msg.rc.chan13 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan13, CRSF_CHANNEL_MAX);
+    msg.rc.chan14 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan14, CRSF_CHANNEL_MAX);
+    msg.rc.chan15 =
+        LIMIT(CRSF_CHANNEL_MIN, pChannels->chan15, CRSF_CHANNEL_MAX);
     return _crsf_send_packet(pHndl, &msg, CRSFMsgRC, sizeof(_crsf_rc_t));
 }
 
-eCRSFError crsf_write_battery(CRSF_t *pHndl, crsf_battery_t *pBattery) {
+eCRSFError crsf_write_battery(CRSF_t *pHndl, const crsf_battery_t *pBattery) {
+    if (!pHndl || !pBattery) {
+        return eCRSFNULL;
+    }
+    _crsf_msg_t msg;
+    msg.batt.voltage = (uint16_t) (LIMIT(0, pBattery->voltage, 100) * 10);
+    msg.batt.current = (uint16_t) (LIMIT(0, pBattery->current, 500) * 10);
+    uint32_t capacity = pBattery->capacity;
+    msg.batt.capacity[0] = capacity & 0xFF;
+    msg.batt.capacity[1] = (capacity >> 8) & 0xFF;
+    msg.batt.capacity[2] = (capacity >> 16) & 0xFF;
+    msg.batt.percent_remaining = LIMIT(0, pBattery->percent_remaining, 100);
+    return _crsf_send_packet(pHndl, &msg, CRSFMsgBatt, sizeof(_crsf_battery_t));
 }
-eCRSFError crsf_write_attitude(CRSF_t *pHndl, crsf_attitude_t *pAttitude) {
+
+eCRSFError crsf_write_attitude(CRSF_t *pHndl,
+                               const crsf_attitude_t *pAttitude) {
+    if (!pHndl || !pAttitude) {
+        return eCRSFNULL;
+    }
+    _crsf_msg_t msg;
+    msg.att.pitch =
+        (int16_t) (LIMIT(INT16_MIN, pAttitude->pitch * 10000, INT16_MAX));
+    msg.att.yaw =
+        (int16_t) (LIMIT(INT16_MIN, pAttitude->yaw * 10000, INT16_MAX));
+    msg.att.roll =
+        (int16_t) (LIMIT(INT16_MIN, pAttitude->roll * 10000, INT16_MAX));
+    return _crsf_send_packet(pHndl, &msg, CRSFMsgAtt, sizeof(_crsf_attitude_t));
 }
-eCRSFError crsf_write_mode(CRSF_t *pHndl, crsf_fcmode_t *pMode) {
+
+eCRSFError crsf_write_mode(CRSF_t *pHndl, const crsf_fcmode_t *pMode) {
+    if (!pHndl || !pMode) {
+        return eCRSFNULL;
+    }
+    _crsf_msg_t msg;
+    memcpy(msg.mode.mode, pMode->mode, CRSF_STR_LEN);
+    return _crsf_send_packet(pHndl, &msg, CRSFMsgFlightMode, sizeof(_crsf_fcmode_t));
 }
 
 eCRSFError crsf_read_rc(CRSF_t *pHndl, crsf_rc_t *pChannels) {

@@ -56,8 +56,9 @@ typedef struct {
 } crsf_gps_t;
 
 typedef struct {
+    // V
     float voltage;
-    // mA
+    // A
     float current;
     // mAh
     uint32_t capacity;

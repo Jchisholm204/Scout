@@ -80,11 +80,11 @@ typedef struct CRSF {
 extern StreamBufferHandle_t crsf_init(CRSF_t *pHndl,
                                       StreamBufferHandle_t pTx_hndl);
 
-extern eCRSFError crsf_write_rc(CRSF_t *pHndl, crsf_rc_t *pChannels);
-extern eCRSFError crsf_write_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);
+extern eCRSFError crsf_write_rc(CRSF_t *pHndl, const crsf_rc_t *pChannels);
+extern eCRSFError crsf_write_battery(CRSF_t *pHndl, const crsf_battery_t *pBattery);
 extern eCRSFError crsf_write_attitude(CRSF_t *pHndl,
-                                      crsf_attitude_t *pAttitude);
-extern eCRSFError crsf_write_mode(CRSF_t *pHndl, crsf_fcmode_t *pMode);
+                                      const crsf_attitude_t *pAttitude);
+extern eCRSFError crsf_write_mode(CRSF_t *pHndl, const crsf_fcmode_t *pMode);
 
 extern eCRSFError crsf_read_rc(CRSF_t *pHndl, crsf_rc_t *pChannels);
 extern eCRSFError crsf_read_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);

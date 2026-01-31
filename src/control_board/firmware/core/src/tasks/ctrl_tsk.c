@@ -33,10 +33,11 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                                         &pHndl->tsk.static_task);
 
     pHndl->rc_crsf.buf_hndl =
-        xStreamBufferCreateStatic(configMINIMAL_STACK_SIZE,
-                                  1,
-                                  pHndl->rc_crsf.storage_area,
-                                  &pHndl->rc_crsf.stream_buffer);
+        serial_create_write_buffer(rc_serial,
+                                   configMINIMAL_STACK_SIZE,
+                                   1,
+                                   pHndl->rc_crsf.storage_area,
+                                   &pHndl->rc_crsf.stream_buffer);
 
     StreamBufferHandle_t rx_hndl =
         crsf_init(&pHndl->rc_crsf.crsf, pHndl->rc_crsf.buf_hndl);
@@ -110,6 +111,9 @@ void vCtrlTsk(void *pvParams) {
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
         crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
+        crsf_battery_t bat;
+        crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
+        crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
         float ct_x = crsf_normalize(rc.chan2);
         float ct_y = crsf_normalize(rc.chan1);
