@@ -54,6 +54,8 @@ void Init(void) {
         serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);
     Serial_t *Serial2 =
         serial_init(eSerial2, /*baud*/ CRSF_BAUD, PIN_USART2_RX, PIN_USART2_TX);
+    Serial_t *Serial5 =
+        serial_init(eSerial5, /*baud*/ CRSF_BAUD, PIN_UART5_RX, PIN_UART5_TX);
 
     // Register Serial Port 3 as STDIO
     // (Use this serial port for printf)
@@ -70,7 +72,7 @@ void Init(void) {
     //     gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
     CtrlQueueHndl_t slqh =
         sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, Serial5, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
 
     return;
 }

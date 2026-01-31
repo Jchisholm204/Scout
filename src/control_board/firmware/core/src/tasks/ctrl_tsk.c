@@ -19,6 +19,7 @@ void vCtrlTsk(void *pvParams);
 
 int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                   Serial_t *rc_serial,
+                  Serial_t *fc_serial,
                   QueueHandle_t usb_rx,
                   QueueHandle_t usb_tx,
                   QueueHandle_t col_rx) {
@@ -45,6 +46,21 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     }
 
     serial_attach(rc_serial, rx_hndl);
+
+    pHndl->fc_crsf.buf_hndl =
+        serial_create_write_buffer(fc_serial,
+                                   configMINIMAL_STACK_SIZE,
+                                   1,
+                                   pHndl->fc_crsf.storage_area,
+                                   &pHndl->fc_crsf.stream_buffer);
+
+    rx_hndl = crsf_init(&pHndl->fc_crsf.crsf, pHndl->fc_crsf.buf_hndl);
+
+    if (!rx_hndl) {
+        printf("CRSF INI Fail\n");
+    }
+
+    serial_attach(fc_serial, rx_hndl);
 
     pHndl->usb.tx = usb_tx;
     pHndl->usb.rx = usb_rx;
@@ -93,6 +109,7 @@ void vCtrlTsk(void *pvParams) {
         // Handle Controller Input
         crsf_rc_t rc;
         crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
+        crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
 
         float ct_x = crsf_normalize(rc.chan2);
         float ct_y = crsf_normalize(rc.chan1);
@@ -111,11 +128,11 @@ void vCtrlTsk(void *pvParams) {
             }
             pid_z = (float) pidc_calculate(
                 &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
-            pid_x = (float) pidc_calculate(
-                &pHndl->pid_x, 0, (double) -ct.cv.x, dt);
-            pid_y = (float) pidc_calculate(
-                &pHndl->pid_y, 0, (double) ct.cv.y, dt);
-            printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
+            pid_x =
+                (float) pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
+            pid_y =
+                (float) pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
+            // printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
         }
 
         // Mode Switch Case
