@@ -14,6 +14,7 @@
 #include "drone_defs.h"
 
 enum eAntigravState {
+    eAntigravStateReset,
     eAntigravStateLiftoff,
     eAntigravStateAutotune,
     eAntigravStateNormal,
@@ -35,13 +36,27 @@ static inline void antigrav_init(struct antigravity_controller *const pHndl,
     pHndl->current_throttle = base_throttle;
     pHndl->max_throttle = max_throttle;
     pHndl->last = (ctrl_vec_t) {{0, 0, 0, 0}};
-    pHndl->state = eAntigravStateNormal;
+    pHndl->state = eAntigravStateReset;
 }
 
 static inline void antigrav_reset(struct antigravity_controller *const pHndl) {
+    pHndl->state = eAntigravStateReset;
 }
 
 static inline ctrl_vec_t antigrav_liftoff(struct antigravity_controller *const pHndl) {
+    if(pHndl->state != eAntigravStateLiftoff){
+        pHndl->last = (ctrl_vec_t){{0, 0, 0, 0}};
+    }
+    ctrl_vec_t cv = pHndl->last;
+    cv.z += 0.0004f;
+    if(cv.z >= 0.28f){
+        pHndl->state = eAntigravStateNormal;
+    }
+    else{
+    pHndl->state = eAntigravStateLiftoff;
+    }
+    pHndl->last = cv;
+    return cv;
 }
 
 static inline enum eAntigravState antigrav_checkstate(struct antigravity_controller *const pHndl){
