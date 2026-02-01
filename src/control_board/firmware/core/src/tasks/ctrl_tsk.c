@@ -189,7 +189,8 @@ void vCtrlTsk(void *pvParams) {
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
         // Check the arming condition
-        if (rc.chan4 < CRSF_CHANNEL_ZERO) {
+        if (rc.chan4 < CRSF_CHANNEL_ZERO ||
+            pHndl->rc_crsf.crsf.state == eCRSFTimeout) {
             pHndl->mode = eModeDisabled;
         }
         // Control switch to init mode when arming condition is met
