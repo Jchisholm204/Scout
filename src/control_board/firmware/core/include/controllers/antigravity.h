@@ -43,13 +43,13 @@ static inline void antigrav_reset(struct antigravity_controller *const pHndl) {
     pHndl->state = eAntigravStateReset;
 }
 
-static inline ctrl_vec_t antigrav_liftoff(struct antigravity_controller *const pHndl) {
+static inline ctrl_vec_t antigrav_liftoff(struct antigravity_controller *const pHndl, ctrl_vec_t col_vec) {
     if(pHndl->state != eAntigravStateLiftoff){
         pHndl->last = (ctrl_vec_t){{0, 0, 0, 0}};
     }
     ctrl_vec_t cv = pHndl->last;
-    cv.z += 0.0004f;
-    if(cv.z >= 0.28f){
+    cv.z += 0.0004;
+    if(cv.z >= 0.28){
         pHndl->state = eAntigravStateNormal;
     }
     else{
@@ -64,7 +64,7 @@ static inline enum eAntigravState antigrav_checkstate(struct antigravity_control
 }
 
 static inline ctrl_vec_t antigrav_run(
-    struct antigravity_controller *const pHndl, ctrl_vec_t *pCv) {
+    struct antigravity_controller *const pHndl, ctrl_vec_t cv_ctrl, ctrl_vec_t cv_col) {
 }
 
 #endif

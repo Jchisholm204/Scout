@@ -48,10 +48,8 @@ struct ctrl_tsk {
         QueueHandle_t rx;
     } usb;
 
-    struct pid_controller pid_z;
     struct pid_controller pid_x;
     struct pid_controller pid_y;
-
     struct antigravity_controller antigrav;
 
     enum eCBMode mode;

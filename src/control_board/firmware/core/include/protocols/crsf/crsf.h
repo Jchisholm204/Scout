@@ -81,7 +81,8 @@ extern StreamBufferHandle_t crsf_init(CRSF_t *pHndl,
                                       StreamBufferHandle_t pTx_hndl);
 
 extern eCRSFError crsf_write_rc(CRSF_t *pHndl, const crsf_rc_t *pChannels);
-extern eCRSFError crsf_write_battery(CRSF_t *pHndl, const crsf_battery_t *pBattery);
+extern eCRSFError crsf_write_battery(CRSF_t *pHndl,
+                                     const crsf_battery_t *pBattery);
 extern eCRSFError crsf_write_attitude(CRSF_t *pHndl,
                                       const crsf_attitude_t *pAttitude);
 extern eCRSFError crsf_write_mode(CRSF_t *pHndl, const crsf_fcmode_t *pMode);
@@ -91,20 +92,20 @@ extern eCRSFError crsf_read_battery(CRSF_t *pHndl, crsf_battery_t *pBattery);
 extern eCRSFError crsf_read_attitude(CRSF_t *pHndl, crsf_attitude_t *pAttitude);
 extern eCRSFError crsf_read_mode(CRSF_t *pHndl, crsf_fcmode_t *pMode);
 
-static inline float crsf_normalize(uint16_t raw){
+static inline double crsf_normalize(uint16_t raw) {
     if (raw < CRSF_CHANNEL_MIN)
         raw = CRSF_CHANNEL_MIN;
     if (raw > CRSF_CHANNEL_MAX)
         raw = CRSF_CHANNEL_MAX;
-    return ((float) raw - 992.0f) / 819.5f;
+    return ((double) raw - 992.0) / 819.5;
 }
 
-static inline uint16_t crsf_unnormal(float value){
+static inline uint16_t crsf_unnormal(double value) {
     if (value < -1)
         value = -1;
     if (value > 1)
         value = 1;
-    return (uint16_t)((value*819.5f) + 992.0f);
+    return (uint16_t) ((value * 819.5) + 992.0);
 }
 
 #endif
