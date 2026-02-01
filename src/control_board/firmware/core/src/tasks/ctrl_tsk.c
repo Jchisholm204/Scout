@@ -81,35 +81,31 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 }
 
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
-    const double p_const = 0.42;
-    const double a_const = 0.1000;
-    // const double g_const = 0.6000;
-    const double i_const = 0.0035;
-    const double d_const = 0.0020;
-    const double f_const = 0.2819;
 
-    // pidc_init(&pHndl->pid_z, p_const, i_const, d_const, 0, 0.5);
-    // pidc_set_accel(&pHndl->pid_z, a_const);
-    // pidc_set_ff(&pHndl->pid_z, f_const);
+    // Hover/Z PID
+    pidc_init(&pHndl->pid_z, 0.05, 0.0035, 0.05, 0, 0.6);
+    pidc_set_accel(&pHndl->pid_z, 0.1);
+    // Hover Constant
+    pidc_set_ff(&pHndl->pid_z, 0.2819);
 
-    const double p_xy = 0.180;
-    const double d_xy = 0.00025;
-    pidc_init(&pHndl->pid_x, p_xy, 0, d_xy, -0.15, 0.15);
-    pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
+    const double p_xy = 0.002;
+    const double d_xy = 0.0006;
+    pidc_init(&pHndl->pid_x, p_xy, 0, d_xy, -0.4, 0.4);
+    pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.4, 0.4);
 
-    antigrav_init(&pHndl->antigrav, 0.05, 0.5);
+    // antigrav_init(&pHndl->antigrav, 0.05, 0.5);
 
     return 0;
 }
 
 int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
     // Reset the PID controllers
-    // pidc_reset(&pHndl->pid_z);
+    pidc_reset(&pHndl->pid_z);
     pidc_reset(&pHndl->pid_x);
     pidc_reset(&pHndl->pid_y);
 
     // Reset the antigravity controller
-    antigrav_reset(&pHndl->antigrav);
+    // antigrav_reset(&pHndl->antigrav);
     return 0;
 }
 
@@ -117,10 +113,7 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
                                 ctrl_vec_t cv_in,
                                 ctrl_vec_t cv_colsn) {
     TickType_t last_wake_time = xTaskGetTickCount();
-    const double f_const = 0.2819;
-    const double psc_const = 0.05;
-    static double pid_z = 0.0;
-
+    static double pid_z = 0;
     static double pid_y = 0;
     static double pid_x = 0;
 
@@ -130,10 +123,9 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     if (dt <= 0.000001) {
         dt = 0.005;
     }
-    // pid_z = pidc_calculate(&pHndl->pid_z, 0, (double) -ct.z * psc_const, dt);
+    pid_z = pidc_calculate(&pHndl->pid_z, 0, (double) -ctrl_vec_normal(cv_colsn).z, dt);
     pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.x, dt);
     pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.y, dt);
-    ctrl_vec_print("Col Vec", cv_colsn);
 
     ctrl_vec_t ctrl_v = cv_in;
     ctrl_v.z = pid_z;
@@ -143,7 +135,7 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     ctrl_v.x += pid_x;
     ctrl_v.y += pid_y;
 
-    ctrl_v = antigrav_run(&pHndl->antigrav, ctrl_v, cv_colsn);
+    // ctrl_v = antigrav_run(&pHndl->antigrav, ctrl_v, cv_colsn);
 
     return ctrl_v;
 }
@@ -219,7 +211,7 @@ void vCtrlTsk(void *pvParams) {
                 pHndl->mode = eModeStalled;
             }
         } else if (pHndl->mode == eModeInit) {
-            if (antigrav_checkstate(&pHndl->antigrav) == eAntigravStateNormal)
+            // if (antigrav_checkstate(&pHndl->antigrav) == eAntigravStateNormal)
                 pHndl->mode = eModeStalled;
         }
 
@@ -243,12 +235,16 @@ void vCtrlTsk(void *pvParams) {
         ctrl_vec_t cv_final = {0};
         switch (pHndl->mode) {
         case eModeInit:
-            cv_final = antigrav_liftoff(&pHndl->antigrav, cs_collision.cv);
+            // cv_final = antigrav_liftoff(&pHndl->antigrav, cs_collision.cv);
             break;
         case eModeRC:
             cv_final = ctrl_run_manual(pHndl);
             break;
         case eModeStalled:
+            cv_final = ctrl_run_controllers(pHndl,
+                                            (ctrl_vec_t){0},
+                                            cs_collision.cv);
+            break;
         case eModeRCAuto:
             cv_final = ctrl_run_controllers(pHndl,
                                             ctrl_run_manual(pHndl),
@@ -268,8 +264,10 @@ void vCtrlTsk(void *pvParams) {
 
         // USB Control Output
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 4; i++){
             pkt_rx.vel.data[i] = (float) cv_final.data[i];
+            pkt_rx.cv.data[i] = (float) cs_collision.cv.data[i];
+        }
         (void) xQueueGenericSend(pHndl->usb.rx, &pkt_rx, 1, queueOVERWRITE);
 
         // CRSF Output to Flight Controller

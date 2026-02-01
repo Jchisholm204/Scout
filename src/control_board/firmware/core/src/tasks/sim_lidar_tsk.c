@@ -56,12 +56,7 @@ CtrlQueueHndl_t sim_lidar_tsk_init(struct sim_lidar_tsk *pHndl,
     return pHndl->cvtx.hndl;
 }
 
-static inline float arm_sqrtf(float val) {
-    float res;
-    __asm volatile("vsqrt.f32 %0, %1" : "=t"(res) : "t"(val));
-    return res;
-}
-
+// Need a bounding box within a bounding box
 void vSimLidarTsk(void *pvParams) {
     struct sim_lidar_tsk *pHndl = (struct sim_lidar_tsk *) pvParams;
 
@@ -146,8 +141,6 @@ void vSimLidarTsk(void *pvParams) {
             cs.ground_distance += pHndl->ground_sums[i];
             cs.ceil_distance += pHndl->ceil_sums[i];
         }
-
-        cs.cv = ctrl_vec_normal(cs.cv);
 
         // Send CV to control task
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);

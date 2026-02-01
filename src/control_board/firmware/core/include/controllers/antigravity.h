@@ -28,7 +28,6 @@ struct antigravity_controller {
     enum eAntigravState state;
 };
 
-
 static inline void antigrav_init(struct antigravity_controller *const pHndl,
                                  double base_throttle,
                                  double max_throttle) {
@@ -41,30 +40,42 @@ static inline void antigrav_init(struct antigravity_controller *const pHndl,
 
 static inline void antigrav_reset(struct antigravity_controller *const pHndl) {
     pHndl->state = eAntigravStateReset;
+    pHndl->current_throttle = 0.0;
 }
 
-static inline ctrl_vec_t antigrav_liftoff(struct antigravity_controller *const pHndl, ctrl_vec_t col_vec) {
-    if(pHndl->state != eAntigravStateLiftoff){
-        pHndl->last = (ctrl_vec_t){{0, 0, 0, 0}};
+static inline ctrl_vec_t antigrav_liftoff(
+    struct antigravity_controller *const pHndl, const ctrl_vec_t col_vec) {
+    if (pHndl->state != eAntigravStateLiftoff) {
+        pHndl->last = (ctrl_vec_t) {{0, 0, 0, 0}};
+        pHndl->current_throttle = pHndl->base_throttle;
     }
-    ctrl_vec_t cv = pHndl->last;
-    cv.z += 0.0004;
-    if(cv.z >= 0.28){
+    pHndl->state = eAntigravStateLiftoff;
+
+    pHndl->current_throttle = col_vec.z + 0.28;
+    // ctrl_vec_print("Liftoff", col_vec);
+    ctrl_vec_t cv = {0};
+    cv.z = pHndl->current_throttle;
+
+    printf("Liftoff: z=%.2f t=%.4f\n", col_vec.z, pHndl->current_throttle);
+
+    if(col_vec.z == 0){
         pHndl->state = eAntigravStateNormal;
     }
-    else{
-    pHndl->state = eAntigravStateLiftoff;
-    }
-    pHndl->last = cv;
+
     return cv;
 }
 
-static inline enum eAntigravState antigrav_checkstate(struct antigravity_controller *const pHndl){
+static inline enum eAntigravState antigrav_checkstate(
+    struct antigravity_controller *const pHndl) {
     return pHndl->state;
 }
 
 static inline ctrl_vec_t antigrav_run(
-    struct antigravity_controller *const pHndl, ctrl_vec_t cv_ctrl, ctrl_vec_t cv_col) {
+    struct antigravity_controller *const pHndl,
+    ctrl_vec_t cv_ctrl,
+    ctrl_vec_t cv_col) {
+    cv_ctrl.z = pHndl->current_throttle;
+    return cv_ctrl;
 }
 
 #endif

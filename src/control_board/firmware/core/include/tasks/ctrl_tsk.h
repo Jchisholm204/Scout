@@ -50,7 +50,8 @@ struct ctrl_tsk {
 
     struct pid_controller pid_x;
     struct pid_controller pid_y;
-    struct antigravity_controller antigrav;
+    struct pid_controller pid_z;
+    // struct antigravity_controller antigrav;
 
     enum eCBMode mode;
 
