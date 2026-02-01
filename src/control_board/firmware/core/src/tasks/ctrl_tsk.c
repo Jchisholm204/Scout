@@ -104,25 +104,13 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
 }
 
 ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
-    (void) pHndl;
     TickType_t last_wake_time = xTaskGetTickCount();
     const double f_const = 0.2819;
     const double psc_const = 0.05;
-    float pid_z = 0.0f;
+    static float pid_z = 0.0f;
 
-    float pid_x = 0;
-    float pid_y = 0;
-
-    // Handle Controller Input
-    crsf_rc_t rc;
-    crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
-    crsf_write_rc(&pHndl->fc_crsf.crsf, &rc);
-
-    float ct_x = crsf_normalize(rc.chan2);
-    float ct_y = crsf_normalize(rc.chan1);
-    // Normalize the throttle to a percentatge value
-    float ct_z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
-    float ct_w = crsf_normalize(rc.chan3);
+    static float pid_x = 0;
+    static float pid_y = 0;
 
     // Handle Lidar control input
     ctrl_state_t ct;
@@ -136,10 +124,9 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
             &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
         pid_x = (float) pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
         pid_y = (float) pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
-        // printf("Z: %3.3f X: %2.2f Y: %2.2f\n", pid_z, pid_x, pid_y);
     }
 
-    ctrl_vec_t ctrl_v;
+    static ctrl_vec_t ctrl_v;
     ctrl_v.z = pid_z;
     ctrl_v.x *= 0.5f;
     ctrl_v.y *= 0.5f;
@@ -160,7 +147,7 @@ ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
     // TAER Mapping
     cv.x = crsf_normalize(rc.chan2);
     cv.y = crsf_normalize(rc.chan1);
-    cv.z = crsf_normalize(rc.chan0);
+    cv.z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
     cv.w = crsf_normalize(rc.chan3);
 
     return cv;
@@ -173,13 +160,40 @@ void vCtrlTsk(void *pvParams) {
     ctrl_setup_controllers(pHndl);
 
     TickType_t last_wake_time = xTaskGetTickCount();
+    TickType_t last_update_time = xTaskGetTickCount();
 
     enum eCBMode current_mode = eModeRC;
-    enum eCBMode target_mode = eModeRC;
 
     for (;;) {
         // Ensure a consistent sample time delay
         vTaskDelayUntil(&last_wake_time, 20);
+
+        if (xTaskGetTickCount() >= (last_update_time + 500)) {
+            last_update_time = xTaskGetTickCount();
+            printf("Ctrl Mode: ");
+            switch (current_mode) {
+            case eModeDisabled:
+                printf("Disabled\n");
+                break;
+            case eModeInit:
+                printf("Init\n");
+                break;
+            case eModeRC:
+                printf("Remote Control\n");
+                break;
+            case eModeStalled:
+                printf("Stalled\n");
+            case eModeRCAuto:
+                printf("RC Automatic\n");
+                break;
+            case eModeAuto:
+                printf("Automatic\n");
+                break;
+            case eModeFault:
+                printf("Fault\n");
+                break;
+            }
+        }
 
         // Read input data from the controller (primary source of truth)
         crsf_rc_t rc;
@@ -208,18 +222,13 @@ void vCtrlTsk(void *pvParams) {
 
         // Read input data from the Jetson
         ctrl_vec_t cv_jetson = {0};
-        // xQueueReceive
-        // Switch to semi automatic if jetson fails
-        if (!pdTRUE) {
-            // Log the current mode as the perfered mode
-            target_mode = current_mode;
-            current_mode = eModeStalled;
-        } else {
-            // Handle High level Mode Change Requests
-
-            // Switch back to the prefered mode
-            current_mode = target_mode;
-        }
+        struct udev_pkt_ctrl_tx udev_ctrl;
+        // if (xQueueReceive(pHndl->usb.tx, &udev_ctrl, 0) == pdTRUE) {
+        //     cv_jetson.x = udev_ctrl.vel.x;
+        //     cv_jetson.y = udev_ctrl.vel.y;
+        //     cv_jetson.z = udev_ctrl.vel.z;
+        //     cv_jetson.w = udev_ctrl.vel.w;
+        // }
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
@@ -244,6 +253,7 @@ void vCtrlTsk(void *pvParams) {
         }
 
         // Send out control outputs
+        cv_final.z = (cv_final.z * 2.0f) - 1.0f;
 
         // USB Control Output
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};

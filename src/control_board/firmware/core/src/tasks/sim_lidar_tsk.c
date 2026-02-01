@@ -70,7 +70,7 @@ void vSimLidarTsk(void *pvParams) {
     for (;;) {
         // Attempt to pull the latest packet from the incoming process queue
         static struct udev_pkt_lidar ldrpkt = {0};
-        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) != pdTRUE) {
+        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 500) != pdTRUE) {
             // Input Queue Empty
             printf("Lidar Input Queue Empty\n");
             continue;
