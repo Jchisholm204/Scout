@@ -118,10 +118,10 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     TickType_t last_wake_time = xTaskGetTickCount();
     const double f_const = 0.2819;
     const double psc_const = 0.05;
-    static float pid_z = 0.0f;
+    static double pid_z = 0.0f;
 
-    static float pid_x = 0;
-    static float pid_y = 0;
+    static double pid_y = 0;
+    static double pid_x = 0;
 
     // Handle Lidar control input
     ctrl_state_t ct;
@@ -131,17 +131,18 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
         if (dt <= 0.000001) {
             dt = 0.005;
         }
-        pid_z = (float) pidc_calculate(
+        pid_z = pidc_calculate(
             &pHndl->pid_z, 0, (double) -ct.cv.z * psc_const, dt);
-        pid_x = (float) pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
-        pid_y = (float) pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
+        pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -ct.cv.x, dt);
+        pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) ct.cv.y, dt);
+        ctrl_vec_print("Col Vec", ct.cv);
     }
 
     static ctrl_vec_t ctrl_v;
     ctrl_v.z = pid_z;
-    ctrl_v.x *= 0.5f;
-    ctrl_v.y *= 0.5f;
-    ctrl_v.w *= 0.5f;
+    ctrl_v.x *= 0.5;
+    ctrl_v.y *= 0.5;
+    ctrl_v.w *= 0.5;
     ctrl_v.x += pid_x;
     ctrl_v.y += pid_y;
 
@@ -156,10 +157,10 @@ ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
     crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
 
     // TAER Mapping
-    cv.x = crsf_normalize(rc.chan2);
-    cv.y = crsf_normalize(rc.chan1);
-    cv.z = (crsf_normalize(rc.chan0) + 1.0f) / 2.0f;
-    cv.w = crsf_normalize(rc.chan3);
+    cv.x = (double)crsf_normalize(rc.chan2);
+    cv.y = (double)crsf_normalize(rc.chan1);
+    cv.z = (double)(crsf_normalize(rc.chan0) + 1.0f) / 2.0;
+    cv.w = (double)crsf_normalize(rc.chan3);
 
     return cv;
 }
@@ -177,7 +178,7 @@ void vCtrlTsk(void *pvParams) {
 
     for (;;) {
         // Ensure a consistent sample time delay
-        vTaskDelayUntil(&last_wake_time, 20);
+        vTaskDelayUntil(&last_wake_time, 5);
 
         // Read input data from the controller (primary source of truth)
         crsf_rc_t rc;

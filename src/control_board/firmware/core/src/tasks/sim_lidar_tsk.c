@@ -147,6 +147,8 @@ void vSimLidarTsk(void *pvParams) {
             cs.ceil_distance += pHndl->ceil_sums[i];
         }
 
+        cs.cv = ctrl_vec_normal(cs.cv);
+
         // Send CV to control task
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);
 
