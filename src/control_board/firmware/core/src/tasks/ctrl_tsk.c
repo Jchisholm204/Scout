@@ -71,6 +71,7 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     return 0;
 }
 
+
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     const double p_const = 0.0042;
     const double a_const = 0.1000;
@@ -89,6 +90,8 @@ int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
 
     antigrav_init(&pHndl->antigrav, 0.05, 0.5);
+    
+    pHndl->mode = eModeStalled;
 
     return 0;
 }
@@ -165,7 +168,7 @@ void vCtrlTsk(void *pvParams) {
     TickType_t last_update_time = xTaskGetTickCount();
     TickType_t last_jetson_time = xTaskGetTickCount();
 
-    enum eCBMode current_mode = eModeRC;
+    pHndl->mode = eModeRC;
 
     for (;;) {
         // Ensure a consistent sample time delay
@@ -174,7 +177,7 @@ void vCtrlTsk(void *pvParams) {
         if (xTaskGetTickCount() >= (last_update_time + 500)) {
             last_update_time = xTaskGetTickCount();
             printf("Ctrl Mode: ");
-            switch (current_mode) {
+            switch (pHndl->mode) {
             case eModeDisabled:
                 printf("Disabled\n");
                 break;
@@ -209,17 +212,17 @@ void vCtrlTsk(void *pvParams) {
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
         // Enable mode switching operations under these conditions
-        if (current_mode != eModeDisabled && current_mode != eModeInit) {
+        if (pHndl->mode != eModeDisabled && pHndl->mode != eModeInit) {
             // Decode operating parameters selections
             switch (rc.chan6) {
             case CRSF_CHANNEL_MIN:
-                current_mode = eModeRC;
+                pHndl->mode = eModeRC;
                 break;
             case CRSF_CHANNEL_ZERO:
-                current_mode = eModeRCAuto;
+                pHndl->mode = eModeRCAuto;
                 break;
             case CRSF_CHANNEL_MAX:
-                current_mode = eModeAuto;
+                pHndl->mode = eModeAuto;
                 break;
             default:
                 break;
@@ -228,11 +231,11 @@ void vCtrlTsk(void *pvParams) {
 
         // Check the arming condition
         if (rc.chan4 < CRSF_CHANNEL_ZERO) {
-            current_mode = eModeDisabled;
+            pHndl->mode = eModeDisabled;
         }
         // Control switch to init mode when arming condition is met
-        else if (current_mode == eModeDisabled) {
-            current_mode = eModeInit;
+        else if (pHndl->mode == eModeDisabled) {
+            pHndl->mode = eModeInit;
         }
 
         // Read input data from the Jetson
@@ -245,19 +248,15 @@ void vCtrlTsk(void *pvParams) {
             cv_jetson.z = udev_ctrl.vel.z;
             cv_jetson.w = udev_ctrl.vel.w;
         } else if (xTaskGetTickCount() > (last_jetson_time + 100) &&
-                   current_mode == eModeAuto) {
-            current_mode = eModeStalled;
+                   pHndl->mode == eModeAuto) {
+            pHndl->mode = eModeStalled;
         }
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
-        switch (current_mode) {
+        switch (pHndl->mode) {
         case eModeInit:
-            // if (ctrl_setup_controllers(pHndl)) {
-            //     current_mode = eModeStalled;
-            // }
             ctrl_setup_controllers(pHndl);
-            current_mode = eModeStalled;
             break;
         case eModeRC:
             cv_final = ctrl_run_manual(pHndl);

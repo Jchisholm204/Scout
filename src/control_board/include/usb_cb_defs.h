@@ -13,11 +13,12 @@
 #define _USB_CB_DEFS_H_
 
 enum eCBMode {
+    eModeDisabled,
     eModeInit,
-    eModeStalled,
     eModeRC,
-    eModeNormal,
-    eModeSim,
+    eModeRCAuto,
+    eModeAuto,
+    eModeStalled,
     eModeFault
 };
 

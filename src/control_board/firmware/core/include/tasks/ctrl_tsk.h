@@ -17,6 +17,7 @@
 #include "controllers/pid_controller.h"
 #include "drivers/serial.h"
 #include "protocols/crsf/crsf.h"
+#include "usb_cb_defs.h"
 #include "queue.h"
 #include "semphr.h"
 #include "stream_buffer.h"
@@ -40,7 +41,7 @@ struct ctrl_tsk {
         TaskHandle_t hndl;
         StaticTask_t static_task;
         StackType_t stack[CTRL_TSK_STACK_SIZE];
-    } tsk;
+    } tsk, mon_tsk;
 
     struct {
         QueueHandle_t tx;
@@ -52,6 +53,8 @@ struct ctrl_tsk {
     struct pid_controller pid_y;
 
     struct antigravity_controller antigrav;
+
+    enum eCBMode mode;
 
     QueueHandle_t col_rx;
 };
