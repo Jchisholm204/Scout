@@ -89,6 +89,7 @@ int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
 
     antigrav_init(&pHndl->antigrav, 0.05, 0.5);
+
     return 0;
 }
 
@@ -103,7 +104,8 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
     return 0;
 }
 
-ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
+ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
+                                ctrl_vec_t cv_in) {
     TickType_t last_wake_time = xTaskGetTickCount();
     const double f_const = 0.2819;
     const double psc_const = 0.05;
@@ -134,7 +136,7 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl) {
     ctrl_v.x += pid_x;
     ctrl_v.y += pid_y;
 
-    return ctrl_v;
+    return ctrl_vec_combine(ctrl_v, cv_in, 0.5);
 }
 
 ctrl_vec_t ctrl_run_manual(struct ctrl_tsk *const pHndl) {
@@ -161,6 +163,7 @@ void vCtrlTsk(void *pvParams) {
 
     TickType_t last_wake_time = xTaskGetTickCount();
     TickType_t last_update_time = xTaskGetTickCount();
+    TickType_t last_jetson_time = xTaskGetTickCount();
 
     enum eCBMode current_mode = eModeRC;
 
@@ -183,6 +186,7 @@ void vCtrlTsk(void *pvParams) {
                 break;
             case eModeStalled:
                 printf("Stalled\n");
+                break;
             case eModeRCAuto:
                 printf("RC Automatic\n");
                 break;
@@ -204,51 +208,70 @@ void vCtrlTsk(void *pvParams) {
         crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
-        // Decode operating parameters selections
-        switch (rc.chan6) {
-        case CRSF_CHANNEL_MIN:
-            current_mode = eModeRC;
-            break;
-        case CRSF_CHANNEL_ZERO:
-            current_mode = eModeRCAuto;
-            break;
-        case CRSF_CHANNEL_MAX:
-            current_mode = eModeAuto;
-            break;
-        default:
+        // Enable mode switching operations under these conditions
+        if (current_mode != eModeDisabled && current_mode != eModeInit) {
+            // Decode operating parameters selections
+            switch (rc.chan6) {
+            case CRSF_CHANNEL_MIN:
+                current_mode = eModeRC;
+                break;
+            case CRSF_CHANNEL_ZERO:
+                current_mode = eModeRCAuto;
+                break;
+            case CRSF_CHANNEL_MAX:
+                current_mode = eModeAuto;
+                break;
+            default:
+                break;
+            }
+        }
+
+        // Check the arming condition
+        if (rc.chan4 < CRSF_CHANNEL_ZERO) {
             current_mode = eModeDisabled;
-            break;
+        }
+        // Control switch to init mode when arming condition is met
+        else if (current_mode == eModeDisabled) {
+            current_mode = eModeInit;
         }
 
         // Read input data from the Jetson
-        ctrl_vec_t cv_jetson = {0};
+        static ctrl_vec_t cv_jetson = {0};
         struct udev_pkt_ctrl_tx udev_ctrl;
-        // if (xQueueReceive(pHndl->usb.tx, &udev_ctrl, 0) == pdTRUE) {
-        //     cv_jetson.x = udev_ctrl.vel.x;
-        //     cv_jetson.y = udev_ctrl.vel.y;
-        //     cv_jetson.z = udev_ctrl.vel.z;
-        //     cv_jetson.w = udev_ctrl.vel.w;
-        // }
+        if (xQueueReceive(pHndl->usb.tx, &udev_ctrl, 0) == pdTRUE) {
+            last_jetson_time = xTaskGetTickCount();
+            cv_jetson.x = udev_ctrl.vel.x;
+            cv_jetson.y = udev_ctrl.vel.y;
+            cv_jetson.z = udev_ctrl.vel.z;
+            cv_jetson.w = udev_ctrl.vel.w;
+        } else if (xTaskGetTickCount() > (last_jetson_time + 100) &&
+                   current_mode == eModeAuto) {
+            current_mode = eModeStalled;
+        }
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
         switch (current_mode) {
-        case eModeDisabled:
         case eModeInit:
+            // if (ctrl_setup_controllers(pHndl)) {
+            //     current_mode = eModeStalled;
+            // }
+            ctrl_setup_controllers(pHndl);
+            current_mode = eModeStalled;
+            break;
         case eModeRC:
             cv_final = ctrl_run_manual(pHndl);
             break;
         case eModeStalled:
         case eModeRCAuto:
-            cv_final = ctrl_vec_combine(ctrl_run_controllers(pHndl),
-                                        ctrl_run_manual(pHndl),
-                                        0.5);
+            cv_final = ctrl_run_controllers(pHndl, ctrl_run_manual(pHndl));
             break;
         case eModeAuto:
-            cv_final =
-                ctrl_vec_combine(ctrl_run_controllers(pHndl), cv_jetson, 0.5);
+            cv_final = ctrl_run_controllers(pHndl, cv_jetson);
             break;
+        case eModeDisabled:
         case eModeFault:
+            ctrl_reset_controllers(pHndl);
             break;
         }
 

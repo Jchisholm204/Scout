@@ -35,7 +35,7 @@ static inline void antigrav_reset(struct antigravity_controller *pHndl) {
 }
 
 static inline ctrl_state_t antigrav_run(struct antigravity_controller *pHndl,
-                                           ctrl_state_t *pCs) {
+                                           ctrl_vec_t *pCv) {
 }
 
 #endif
