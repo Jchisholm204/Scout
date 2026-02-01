@@ -13,29 +13,43 @@
 #define _ANTIGRAVITY_H_
 #include "drone_defs.h"
 
+enum eAntigravState {
+    eAntigravStateLiftoff,
+    eAntigravStateAutotune,
+    eAntigravStateNormal,
+};
+
 struct antigravity_controller {
     double base_throttle;
     double max_throttle;
     double current_throttle;
-    ctrl_state_t last;
+    ctrl_vec_t last;
+    enum eAntigravState state;
 };
 
-static inline void antigrav_init(struct antigravity_controller *pHndl,
+
+static inline void antigrav_init(struct antigravity_controller *const pHndl,
                                  double base_throttle,
                                  double max_throttle) {
     pHndl->base_throttle = base_throttle;
     pHndl->current_throttle = base_throttle;
     pHndl->max_throttle = max_throttle;
-    pHndl->last.cv = (ctrl_vec_t) {{0, 0, 0, 0}};
-    pHndl->last.ceil_distance = 0.0;
-    pHndl->last.ground_distance = 0.0;
+    pHndl->last = (ctrl_vec_t) {{0, 0, 0, 0}};
+    pHndl->state = eAntigravStateNormal;
 }
 
-static inline void antigrav_reset(struct antigravity_controller *pHndl) {
+static inline void antigrav_reset(struct antigravity_controller *const pHndl) {
 }
 
-static inline ctrl_state_t antigrav_run(struct antigravity_controller *pHndl,
-                                           ctrl_vec_t *pCv) {
+static inline ctrl_vec_t antigrav_liftoff(struct antigravity_controller *const pHndl) {
+}
+
+static inline enum eAntigravState antigrav_checkstate(struct antigravity_controller *const pHndl){
+    return pHndl->state;
+}
+
+static inline ctrl_vec_t antigrav_run(
+    struct antigravity_controller *const pHndl, ctrl_vec_t *pCv) {
 }
 
 #endif

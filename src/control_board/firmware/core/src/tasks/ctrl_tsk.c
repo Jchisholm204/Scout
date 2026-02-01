@@ -17,6 +17,7 @@
 #include "usb_packet.h"
 
 void vCtrlTsk(void *pvParams);
+void vCtrlMonTsk(void *pvParams);
 
 int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                   Serial_t *rc_serial,
@@ -32,6 +33,14 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                                         configMAX_PRIORITIES - 2,
                                         pHndl->tsk.stack,
                                         &pHndl->tsk.static_task);
+
+    pHndl->mon_tsk.hndl = xTaskCreateStatic(vCtrlMonTsk,
+                                            "ctrl_mon_tsk",
+                                            CTRL_TSK_STACK_SIZE,
+                                            pHndl,
+                                            configMAX_PRIORITIES - 3,
+                                            pHndl->mon_tsk.stack,
+                                            &pHndl->mon_tsk.static_task);
 
     pHndl->rc_crsf.buf_hndl =
         serial_create_write_buffer(rc_serial,
@@ -71,7 +80,6 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
     return 0;
 }
 
-
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     const double p_const = 0.0042;
     const double a_const = 0.1000;
@@ -90,8 +98,6 @@ int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.15, 0.15);
 
     antigrav_init(&pHndl->antigrav, 0.05, 0.5);
-    
-    pHndl->mode = eModeStalled;
 
     return 0;
 }
@@ -165,7 +171,6 @@ void vCtrlTsk(void *pvParams) {
     ctrl_setup_controllers(pHndl);
 
     TickType_t last_wake_time = xTaskGetTickCount();
-    TickType_t last_update_time = xTaskGetTickCount();
     TickType_t last_jetson_time = xTaskGetTickCount();
 
     pHndl->mode = eModeRC;
@@ -173,34 +178,6 @@ void vCtrlTsk(void *pvParams) {
     for (;;) {
         // Ensure a consistent sample time delay
         vTaskDelayUntil(&last_wake_time, 20);
-
-        if (xTaskGetTickCount() >= (last_update_time + 500)) {
-            last_update_time = xTaskGetTickCount();
-            printf("Ctrl Mode: ");
-            switch (pHndl->mode) {
-            case eModeDisabled:
-                printf("Disabled\n");
-                break;
-            case eModeInit:
-                printf("Init\n");
-                break;
-            case eModeRC:
-                printf("Remote Control\n");
-                break;
-            case eModeStalled:
-                printf("Stalled\n");
-                break;
-            case eModeRCAuto:
-                printf("RC Automatic\n");
-                break;
-            case eModeAuto:
-                printf("Automatic\n");
-                break;
-            case eModeFault:
-                printf("Fault\n");
-                break;
-            }
-        }
 
         // Read input data from the controller (primary source of truth)
         crsf_rc_t rc;
@@ -211,8 +188,16 @@ void vCtrlTsk(void *pvParams) {
         crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
-        // Enable mode switching operations under these conditions
-        if (pHndl->mode != eModeDisabled && pHndl->mode != eModeInit) {
+        // Check the arming condition
+        if (rc.chan4 < CRSF_CHANNEL_ZERO) {
+            pHndl->mode = eModeDisabled;
+        }
+        // Control switch to init mode when arming condition is met
+        else if (pHndl->mode == eModeDisabled) {
+            pHndl->mode = eModeInit;
+        }
+        // Control Mode Switching
+        else if (pHndl->mode != eModeInit) {
             // Decode operating parameters selections
             switch (rc.chan6) {
             case CRSF_CHANNEL_MIN:
@@ -227,15 +212,13 @@ void vCtrlTsk(void *pvParams) {
             default:
                 break;
             }
-        }
-
-        // Check the arming condition
-        if (rc.chan4 < CRSF_CHANNEL_ZERO) {
-            pHndl->mode = eModeDisabled;
-        }
-        // Control switch to init mode when arming condition is met
-        else if (pHndl->mode == eModeDisabled) {
-            pHndl->mode = eModeInit;
+            if (xTaskGetTickCount() > (last_jetson_time + 100) &&
+                pHndl->mode == eModeAuto) {
+                pHndl->mode = eModeStalled;
+            }
+        } else if (pHndl->mode == eModeInit) {
+            if (antigrav_checkstate(&pHndl->antigrav) == eAntigravStateNormal)
+                pHndl->mode = eModeStalled;
         }
 
         // Read input data from the Jetson
@@ -247,16 +230,13 @@ void vCtrlTsk(void *pvParams) {
             cv_jetson.y = udev_ctrl.vel.y;
             cv_jetson.z = udev_ctrl.vel.z;
             cv_jetson.w = udev_ctrl.vel.w;
-        } else if (xTaskGetTickCount() > (last_jetson_time + 100) &&
-                   pHndl->mode == eModeAuto) {
-            pHndl->mode = eModeStalled;
         }
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
         switch (pHndl->mode) {
         case eModeInit:
-            ctrl_setup_controllers(pHndl);
+            cv_final = antigrav_liftoff(&pHndl->antigrav);
             break;
         case eModeRC:
             cv_final = ctrl_run_manual(pHndl);
@@ -292,5 +272,39 @@ void vCtrlTsk(void *pvParams) {
         fc_out.chan3 = crsf_unnormal(cv_final.w);
         fc_out.chan4 = rc.chan4;
         crsf_write_rc(&pHndl->fc_crsf.crsf, &fc_out);
+    }
+}
+
+void vCtrlMonTsk(void *pvParams) {
+    struct ctrl_tsk *const pHndl = pvParams;
+    TickType_t last_wake_time = xTaskGetTickCount();
+
+    for (;;) {
+        // Ensure a consistent sample time delay
+        vTaskDelayUntil(&last_wake_time, 500);
+        printf("Ctrl Mode: ");
+        switch (pHndl->mode) {
+        case eModeDisabled:
+            printf("Disabled\n");
+            break;
+        case eModeInit:
+            printf("Init\n");
+            break;
+        case eModeRC:
+            printf("Remote Control\n");
+            break;
+        case eModeStalled:
+            printf("Stalled\n");
+            break;
+        case eModeRCAuto:
+            printf("RC Automatic\n");
+            break;
+        case eModeAuto:
+            printf("Automatic\n");
+            break;
+        case eModeFault:
+            printf("Fault\n");
+            break;
+        }
     }
 }
