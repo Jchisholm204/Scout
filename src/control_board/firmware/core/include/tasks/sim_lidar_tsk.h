@@ -39,10 +39,8 @@ struct sim_lidar_tsk {
         QueueHandle_t rx, tx;
     } usb;
 
-    ctrl_vec_t sums_front[UDEV_LIDAR_SEQ_MAX];
-    ctrl_vec_t sums_vertical[UDEV_LIDAR_SEQ_MAX];
-    float ground_sums[UDEV_LIDAR_SEQ_MAX];
-    float ceil_sums[UDEV_LIDAR_SEQ_MAX];
+    double dist_avgs_front[UDEV_LIDAR_SEQ_MAX];
+    double dist_avgs_vert[UDEV_LIDAR_SEQ_MAX];
 };
 
 extern CtrlQueueHndl_t sim_lidar_tsk_init(struct sim_lidar_tsk *pHndl,

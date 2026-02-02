@@ -45,6 +45,12 @@ struct udev_pkt_ctrl_rx {
         };
         float data[4];
     } vel;
+    union {
+        struct {
+            float x, y, z, w;
+        };
+        float data[4];
+    } cv;
     uint8_t vBatt;
     uint8_t rssi;
     uint8_t status;

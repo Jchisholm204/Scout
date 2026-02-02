@@ -47,16 +47,13 @@ CtrlQueueHndl_t sim_lidar_tsk_init(struct sim_lidar_tsk *pHndl,
 
     // Setup the lidar data storage containers
     for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
-        for (int j = 0; j < 4; j++) {
-            pHndl->sums_front[i].data[j] = 0.0f;
-            pHndl->sums_vertical[i].data[j] = 0.0f;
-        }
+        pHndl->dist_avgs_vert[i] = 0;
+        pHndl->dist_avgs_front[i] = 0;
     }
 
     return pHndl->cvtx.hndl;
 }
 
-// Need a bounding box within a bounding box
 void vSimLidarTsk(void *pvParams) {
     struct sim_lidar_tsk *pHndl = (struct sim_lidar_tsk *) pvParams;
 
@@ -71,33 +68,23 @@ void vSimLidarTsk(void *pvParams) {
             continue;
         }
 
+        int seqn = ldrpkt.hdr.sequence;
+
         // Check that the packet has a valid seq number
-        if (ldrpkt.hdr.sequence >= UDEV_LIDAR_SEQ_MAX) {
+        if (seqn >= UDEV_LIDAR_SEQ_MAX) {
             continue;
         }
 
-        // // Process the incoming data
-        float sum_x = 0.0f;
-        float sum_y = 0.0f;
-        float ground_sum = 0.0f;
-        float ceil_sum = 0.0f;
+        // Process the incoming data
         int valid_points = 0;
+        double dist_avg = 0;
         for (int i = 0; i < ldrpkt.hdr.len; i++) {
             float d = (float) ldrpkt.distances[i] / 4000.0f;
-            if (d > 45.0f || d < 0.1f) {
+            if (d > 12.0f || d < 0.5f) {
                 continue;
             }
             valid_points++;
-            float angle = udev_lidar_angle(ldrpkt.hdr.sequence, i);
-            float weight = 1.0f / d;
-            float cos = cosf(angle);
-            sum_x += weight * cos;
-            if (cos < 0) {
-                ground_sum += fabsf(d * cos);
-            } else {
-                ceil_sum += fabsf(d * cos);
-            }
-            sum_y += weight * sinf(angle);
+            dist_avg += (double) d;
         }
 
         // Dont bother processing packets with no points
@@ -105,42 +92,62 @@ void vSimLidarTsk(void *pvParams) {
             continue;
         }
 
-        // ground_sum /= ((float) valid_points / 2.0f);
-        // ceil_sum /= ((float) valid_points / 2.0f);
+        dist_avg /= (double) valid_points;
 
         // Add the new resultant sum depending on lidar orientation
         if (ldrpkt.hdr.id == eLidarFront) {
-            pHndl->sums_front[ldrpkt.hdr.sequence].x = sum_x;
-            pHndl->sums_front[ldrpkt.hdr.sequence].y = sum_y;
-            pHndl->sums_front[ldrpkt.hdr.sequence].z = 0.0f;
-            pHndl->sums_front[ldrpkt.hdr.sequence].w = 0.0f;
+            pHndl->dist_avgs_front[seqn] = dist_avg;
         }
         if (ldrpkt.hdr.id == eLidarVertical) {
-            pHndl->sums_vertical[ldrpkt.hdr.sequence].x = 0.0f;
-            pHndl->sums_vertical[ldrpkt.hdr.sequence].y = sum_y;
-            pHndl->sums_vertical[ldrpkt.hdr.sequence].z = sum_x;
-            pHndl->sums_vertical[ldrpkt.hdr.sequence].w = 0.0f;
-            pHndl->ceil_sums[ldrpkt.hdr.sequence] = ceil_sum;
-            pHndl->ground_sums[ldrpkt.hdr.sequence] = ground_sum;
+            pHndl->dist_avgs_vert[seqn] = dist_avg;
         }
 
-        // Calculate the collision vector
-        ctrl_state_t cs;
-        cs.cv.x = 0;
-        cs.cv.y = 0;
-        cs.cv.z = 0;
-        cs.cv.w = 0;
-        cs.ground_distance = 0;
-        cs.ceil_distance = 0;
-
+        double v_radius = 0;
+        double h_radius = 0;
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
-            for (int j = 0; j < 4; j++) {
-                cs.cv.data[j] += pHndl->sums_vertical[i].data[j];
-                cs.cv.data[j] += pHndl->sums_front[i].data[j];
-            }
-            cs.ground_distance += pHndl->ground_sums[i];
-            cs.ceil_distance += pHndl->ceil_sums[i];
+            double d_v = pHndl->dist_avgs_vert[i];
+            double d_h = pHndl->dist_avgs_front[i];
+            v_radius += d_v;
+            h_radius += d_h;
         }
+
+        v_radius /= ((double) UDEV_LIDAR_SEQ_MAX);
+        h_radius /= ((double) UDEV_LIDAR_SEQ_MAX);
+
+        ctrl_state_t cs = {0};
+        for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
+            double d_v = pHndl->dist_avgs_vert[i];
+            if (d_v > v_radius) {
+                d_v = 0;
+            } else {
+                d_v = (v_radius - d_v);
+            }
+            double d_h = pHndl->dist_avgs_front[i];
+            if (d_h > h_radius) {
+                d_h = 0;
+            } else {
+                d_h = (h_radius - d_h);
+            }
+            float angle = udev_lidar_angle(i, UDEV_LIDAR_POINTS / 2);
+            cs.cv.x += ((double) cosf(angle) * (d_h));
+            cs.cv.y += ((double) sinf(angle) * (d_h));
+            cs.cv.y += ((double) sinf(angle) * (d_v));
+            cs.cv.z += ((double) cosf(angle) * (d_v));
+        }
+
+        cs.cv.x /= ((double) UDEV_LIDAR_SEQ_MAX);
+        cs.cv.y /= ((double) UDEV_LIDAR_SEQ_MAX);
+        cs.cv.y /= ((double) UDEV_LIDAR_SEQ_MAX);
+        cs.cv.z /= ((double) UDEV_LIDAR_SEQ_MAX);
+
+        cs.ground_distance =
+            (float) (pHndl->dist_avgs_vert[2] + pHndl->dist_avgs_vert[3]) /
+            2.0f;
+        cs.ceil_distance =
+            (float) (pHndl->dist_avgs_vert[0] + pHndl->dist_avgs_vert[5]) /
+            2.0f;
+
+        cs.radius = (float) (v_radius + h_radius) / 2.0f;
 
         // Send CV to control task
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);

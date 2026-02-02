@@ -31,6 +31,7 @@ typedef struct {
     ctrl_vec_t cv;
     float ground_distance;
     float ceil_distance;
+    float radius;
 } ctrl_state_t;
 
 typedef QueueHandle_t CtrlQueueHndl_t;

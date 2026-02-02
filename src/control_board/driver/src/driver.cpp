@@ -77,6 +77,8 @@ Driver::Driver() : Node("cb_driver") {
     // BEGIN Control Interfaces
     _vel_cmd_pub =
         this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/out/vel", 10);
+    _col_cmd_pub =
+        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/out/col", 10);
     _battery_pub =
         this->create_publisher<sensor_msgs::msg::BatteryState>(pub_base + "/out/battery",
                                                                10);
