@@ -12,6 +12,7 @@
 #include "tasks/ctrl_tsk.h"
 
 #include "drone_defs.h"
+#include "os/math.h"
 #include "queue.h"
 #include "usb_cb_defs.h"
 #include "usb_packet.h"
@@ -83,15 +84,13 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
 
     // Hover/Z PID
-    pidc_init(&pHndl->pid_z, 0.05, 0.0035, 0.05, 0, 0.6);
+    pidc_init(&pHndl->pid_z, 0.12, 0.0035, 0.75, 0, 0.6);
     pidc_set_accel(&pHndl->pid_z, 0.1);
     // Hover Constant
     pidc_set_ff(&pHndl->pid_z, 0.2819);
 
-    const double p_xy = 0.002;
-    const double d_xy = 0.0006;
-    pidc_init(&pHndl->pid_x, p_xy, 0, d_xy, -0.4, 0.4);
-    pidc_init(&pHndl->pid_y, p_xy, 0, d_xy, -0.4, 0.4);
+    pidc_init(&pHndl->pid_x, 0.8, 0.05, 0.8, -0.6, 0.2);
+    pidc_init(&pHndl->pid_y, 0.8, 0.05, 0.8, -0.6, 0.6);
 
     // antigrav_init(&pHndl->antigrav, 0.05, 0.5);
 
@@ -111,7 +110,7 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
 
 ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
                                 ctrl_vec_t cv_in,
-                                ctrl_vec_t cv_colsn) {
+                                ctrl_state_t cv_colsn) {
     TickType_t last_wake_time = xTaskGetTickCount();
     static double pid_z = 0;
     static double pid_y = 0;
@@ -123,9 +122,14 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     if (dt <= 0.000001) {
         dt = 0.005;
     }
-    pid_z = pidc_calculate(&pHndl->pid_z, 0, (double) -ctrl_vec_normal(cv_colsn).z, dt);
-    pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.x, dt);
-    pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.y, dt);
+    pid_z = pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt);
+    pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt);
+    pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt);
+
+    double gain = 1 / (1 + ((double) cv_colsn.radius * 0.5));
+
+    pid_x *= gain;
+    pid_y *= gain;
 
     ctrl_vec_t ctrl_v = cv_in;
     ctrl_v.z = pid_z;
@@ -211,8 +215,9 @@ void vCtrlTsk(void *pvParams) {
                 pHndl->mode = eModeStalled;
             }
         } else if (pHndl->mode == eModeInit) {
-            // if (antigrav_checkstate(&pHndl->antigrav) == eAntigravStateNormal)
-                pHndl->mode = eModeStalled;
+            // if (antigrav_checkstate(&pHndl->antigrav) ==
+            // eAntigravStateNormal)
+            pHndl->mode = eModeStalled;
         }
 
         // Read input data from the Jetson
@@ -241,17 +246,16 @@ void vCtrlTsk(void *pvParams) {
             cv_final = ctrl_run_manual(pHndl);
             break;
         case eModeStalled:
-            cv_final = ctrl_run_controllers(pHndl,
-                                            (ctrl_vec_t){0},
-                                            cs_collision.cv);
+            cv_final =
+                ctrl_run_controllers(pHndl, (ctrl_vec_t) {0}, cs_collision);
             break;
         case eModeRCAuto:
             cv_final = ctrl_run_controllers(pHndl,
                                             ctrl_run_manual(pHndl),
-                                            cs_collision.cv);
+                                            cs_collision);
             break;
         case eModeAuto:
-            cv_final = ctrl_run_controllers(pHndl, cv_jetson, cs_collision.cv);
+            cv_final = ctrl_run_controllers(pHndl, cv_jetson, cs_collision);
             break;
         case eModeDisabled:
         case eModeFault:
@@ -264,7 +268,7 @@ void vCtrlTsk(void *pvParams) {
 
         // USB Control Output
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
-        for (int i = 0; i < 4; i++){
+        for (int i = 0; i < 4; i++) {
             pkt_rx.vel.data[i] = (float) cv_final.data[i];
             pkt_rx.cv.data[i] = (float) cs_collision.cv.data[i];
         }

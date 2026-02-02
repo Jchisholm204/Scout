@@ -102,31 +102,29 @@ void vSimLidarTsk(void *pvParams) {
             pHndl->dist_avgs_vert[seqn] = dist_avg;
         }
 
-        double v_radius = 0;
-        double h_radius = 0;
+        double radius = 0;
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             double d_v = pHndl->dist_avgs_vert[i];
             double d_h = pHndl->dist_avgs_front[i];
-            v_radius += d_v;
-            h_radius += d_h;
+            radius += d_v;
+            radius += d_h;
         }
 
-        v_radius /= ((double) UDEV_LIDAR_SEQ_MAX);
-        h_radius /= ((double) UDEV_LIDAR_SEQ_MAX);
+        radius /= ((double) UDEV_LIDAR_SEQ_MAX * 2);
 
         ctrl_state_t cs = {0};
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             double d_v = pHndl->dist_avgs_vert[i];
-            if (d_v > v_radius) {
+            if (d_v > radius) {
                 d_v = 0;
             } else {
-                d_v = (v_radius - d_v);
+                d_v = (radius - d_v);
             }
             double d_h = pHndl->dist_avgs_front[i];
-            if (d_h > h_radius) {
+            if (d_h > radius) {
                 d_h = 0;
             } else {
-                d_h = (h_radius - d_h);
+                d_h = (radius - d_h);
             }
             float angle = udev_lidar_angle(i, UDEV_LIDAR_POINTS / 2);
             cs.cv.x += ((double) cosf(angle) * (d_h));
@@ -147,7 +145,9 @@ void vSimLidarTsk(void *pvParams) {
             (float) (pHndl->dist_avgs_vert[0] + pHndl->dist_avgs_vert[5]) /
             2.0f;
 
-        cs.radius = (float) (v_radius + h_radius) / 2.0f;
+        cs.radius = (float) radius;
+
+        cs.cv.w = cs.radius;
 
         // Send CV to control task
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);
