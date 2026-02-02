@@ -89,8 +89,10 @@ int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     // Hover Constant
     pidc_set_ff(&pHndl->pid_z, 0.2819);
 
-    pidc_init(&pHndl->pid_x, 0.8, 0.05, 0.8, -0.6, 0.2);
-    pidc_init(&pHndl->pid_y, 0.8, 0.05, 0.8, -0.6, 0.6);
+    pidc_init(&pHndl->pid_x, 0.4, 0, 5.8, -0.5, 0.5);
+    pidc_set_accel(&pHndl->pid_x, 1);
+    pidc_init(&pHndl->pid_y, 0.4, 0, 5.8, -0.5, 0.5);
+    pidc_set_accel(&pHndl->pid_x, 1);
 
     // antigrav_init(&pHndl->antigrav, 0.05, 0.5);
 
@@ -126,7 +128,7 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt);
     pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt);
 
-    double gain = 1 / (1 + ((double) cv_colsn.radius * 0.5));
+    double gain = 1 / (1 + ((double) cv_colsn.radius));
 
     pid_x *= gain;
     pid_y *= gain;
