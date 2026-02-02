@@ -29,6 +29,7 @@ typedef union {
 
 typedef struct {
     ctrl_vec_t cv;
+    ctrl_vec_t vel;
     float ground_distance;
     float ceil_distance;
     float radius;

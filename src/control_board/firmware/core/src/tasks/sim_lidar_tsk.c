@@ -49,6 +49,7 @@ CtrlQueueHndl_t sim_lidar_tsk_init(struct sim_lidar_tsk *pHndl,
     for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
         pHndl->dist_avgs_vert[i] = 0;
         pHndl->dist_avgs_front[i] = 0;
+        pHndl->vel_avgs_front[i] = 0;
     }
 
     return pHndl->cvtx.hndl;
@@ -96,41 +97,53 @@ void vSimLidarTsk(void *pvParams) {
 
         // Add the new resultant sum depending on lidar orientation
         if (ldrpkt.hdr.id == eLidarFront) {
+            pHndl->vel_avgs_front[seqn] =
+                ((dist_avg - pHndl->dist_avgs_front[seqn]) * 0.75) +
+                (pHndl->vel_avgs_front[seqn] * 0.15);
             pHndl->dist_avgs_front[seqn] = dist_avg;
         }
         if (ldrpkt.hdr.id == eLidarVertical) {
             pHndl->dist_avgs_vert[seqn] = dist_avg;
         }
 
-        double radius = 0;
+        double radius_v = 0;
+        double radius_h = 0;
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             double d_v = pHndl->dist_avgs_vert[i];
             double d_h = pHndl->dist_avgs_front[i];
-            radius += d_v;
-            radius += d_h;
+            radius_v += d_v;
+            radius_h += d_h;
         }
 
-        radius /= ((double) UDEV_LIDAR_SEQ_MAX * 2);
+        radius_v /= ((double) UDEV_LIDAR_SEQ_MAX);
+        radius_h /= ((double) UDEV_LIDAR_SEQ_MAX);
+
+        if (radius_h > radius_v)
+            radius_h = radius_v;
 
         ctrl_state_t cs = {0};
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             double d_v = pHndl->dist_avgs_vert[i];
-            if (d_v > radius) {
+            if (d_v > radius_v) {
                 d_v = 0;
             } else {
-                d_v = (radius - d_v);
+                d_v = (radius_v - d_v);
             }
             double d_h = pHndl->dist_avgs_front[i];
-            if (d_h > radius) {
+            if (d_h > radius_h) {
                 d_h = 0;
             } else {
-                d_h = (radius - d_h);
+                d_h = (radius_h - d_h);
             }
             float angle = udev_lidar_angle(i, UDEV_LIDAR_POINTS / 2);
             cs.cv.x += ((double) cosf(angle) * (d_h));
             cs.cv.y += ((double) sinf(angle) * (d_h));
             cs.cv.y += ((double) sinf(angle) * (d_v));
             cs.cv.z += ((double) cosf(angle) * (d_v));
+
+            // Velocity
+            cs.vel.x += ((double) cosf(angle) * (pHndl->vel_avgs_front[i]));
+            cs.vel.y += ((double) sinf(angle) * (pHndl->vel_avgs_front[i]));
         }
 
         cs.cv.x /= ((double) UDEV_LIDAR_SEQ_MAX);
@@ -145,9 +158,9 @@ void vSimLidarTsk(void *pvParams) {
             (float) (pHndl->dist_avgs_vert[0] + pHndl->dist_avgs_vert[5]) /
             2.0f;
 
-        cs.radius = (float) radius;
+        cs.radius = (float) radius_h;
 
-        cs.cv.w = cs.radius;
+        cs.cv.w = (radius_h + radius_v) / 2;
 
         // Send CV to control task
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);

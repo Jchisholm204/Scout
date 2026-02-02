@@ -84,14 +84,14 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
 
     // Hover/Z PID
-    pidc_init(&pHndl->pid_z, 0.12, 0.0035, 0.75, 0, 0.6);
+    pidc_init(&pHndl->pid_z, 0.15, 0.004, 0.95, 0, 0.75);
     pidc_set_accel(&pHndl->pid_z, 0.1);
     // Hover Constant
     pidc_set_ff(&pHndl->pid_z, 0.2819);
 
-    pidc_init(&pHndl->pid_x, 0.4, 0, 5.8, -0.5, 0.5);
+    pidc_init(&pHndl->pid_x, 0.88, 0, 2.8, -0.6, 0.6);
     pidc_set_accel(&pHndl->pid_x, 1);
-    pidc_init(&pHndl->pid_y, 0.4, 0, 5.8, -0.5, 0.5);
+    pidc_init(&pHndl->pid_y, 0.88, 0, 2.8, -0.6, 0.6);
     pidc_set_accel(&pHndl->pid_x, 1);
 
     // antigrav_init(&pHndl->antigrav, 0.05, 0.5);
@@ -110,6 +110,12 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
     return 0;
 }
 
+static inline double smooth(double val, double *val_last, double alpha) {
+    double nv = (val * (1-alpha)) + (*val_last * alpha);
+    *val_last = val;
+    return nv;
+}
+
 ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
                                 ctrl_vec_t cv_in,
                                 ctrl_state_t cv_colsn) {
@@ -124,11 +130,12 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     if (dt <= 0.000001) {
         dt = 0.005;
     }
-    pid_z = pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt);
-    pid_x = pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt);
-    pid_y = pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt);
+    pid_z = smooth(pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt), &pid_z, 0.80);
+    pid_x = smooth(pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt), &pid_x, 0.85);
+    pid_y = smooth(pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt), &pid_y, 0.85);
 
-    double gain = 1 / (1 + ((double) cv_colsn.radius));
+    // double gain = 1 / (1 + ((double) cv_colsn.radius));
+    double gain = 1;
 
     pid_x *= gain;
     pid_y *= gain;

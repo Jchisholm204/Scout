@@ -40,6 +40,7 @@ struct sim_lidar_tsk {
     } usb;
 
     double dist_avgs_front[UDEV_LIDAR_SEQ_MAX];
+    double vel_avgs_front[UDEV_LIDAR_SEQ_MAX];
     double dist_avgs_vert[UDEV_LIDAR_SEQ_MAX];
 };
 
