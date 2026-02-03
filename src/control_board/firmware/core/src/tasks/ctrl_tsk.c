@@ -35,6 +35,7 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
                                         pHndl->tsk.stack,
                                         &pHndl->tsk.static_task);
 
+    // Create a second, lower priority task to use as a monitor task
     pHndl->mon_tsk.hndl = xTaskCreateStatic(vCtrlMonTsk,
                                             "ctrl_mon_tsk",
                                             CTRL_TSK_STACK_SIZE,
@@ -94,8 +95,6 @@ int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
     pidc_init(&pHndl->pid_y, 0.88, 0, 2.8, -0.6, 0.6);
     pidc_set_accel(&pHndl->pid_x, 1);
 
-    // antigrav_init(&pHndl->antigrav, 0.05, 0.5);
-
     return 0;
 }
 
@@ -104,14 +103,11 @@ int ctrl_reset_controllers(struct ctrl_tsk *const pHndl) {
     pidc_reset(&pHndl->pid_z);
     pidc_reset(&pHndl->pid_x);
     pidc_reset(&pHndl->pid_y);
-
-    // Reset the antigravity controller
-    // antigrav_reset(&pHndl->antigrav);
     return 0;
 }
 
 static inline double smooth(double val, double *val_last, double alpha) {
-    double nv = (val * (1-alpha)) + (*val_last * alpha);
+    double nv = (val * (1 - alpha)) + (*val_last * alpha);
     *val_last = val;
     return nv;
 }
@@ -128,11 +124,19 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     double dt = ((double) xTaskGetTickCount() - (double) last_wake_time) /
                 (double) configTICK_RATE_HZ;
     if (dt <= 0.000001) {
-        dt = 0.005;
+        dt = ((double) CTRL_TSK_RATE) / 1000.0;
     }
-    pid_z = smooth(pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt), &pid_z, 0.80);
-    pid_x = smooth(pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt), &pid_x, 0.85);
-    pid_y = smooth(pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt), &pid_y, 0.85);
+    pid_z =
+        smooth(pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt),
+               &pid_z,
+               0.80);
+    pid_x =
+        smooth(pidc_calculate(&pHndl->pid_x, 0, (double) -cv_colsn.cv.x, dt),
+               &pid_x,
+               0.85);
+    pid_y = smooth(pidc_calculate(&pHndl->pid_y, 0, (double) cv_colsn.cv.y, dt),
+                   &pid_y,
+                   0.85);
 
     // double gain = 1 / (1 + ((double) cv_colsn.radius));
     double gain = 1;
@@ -176,14 +180,14 @@ void vCtrlTsk(void *pvParams) {
     ctrl_setup_controllers(pHndl);
 
     TickType_t last_wake_time = xTaskGetTickCount();
-    TickType_t last_jetson_time = xTaskGetTickCount();
+    TickType_t last_usb_time = xTaskGetTickCount();
     TickType_t last_collision_time = xTaskGetTickCount();
 
     pHndl->mode = eModeRC;
 
     for (;;) {
         // Ensure a consistent sample time delay
-        vTaskDelayUntil(&last_wake_time, 5);
+        vTaskDelayUntil(&last_wake_time, CTRL_TSK_RATE);
 
         // Read input data from the controller (primary source of truth)
         crsf_rc_t rc;
@@ -219,25 +223,38 @@ void vCtrlTsk(void *pvParams) {
             default:
                 break;
             }
-            if (xTaskGetTickCount() > (last_jetson_time + 100) &&
+            if (CTRL_CHECK_TIMEOUT(last_usb_time) && pHndl->mode == eModeAuto) {
+                pHndl->mode = eModeFault;
+                pHndl->faults |= eFaultUSB;
+            } else {
+                pHndl->faults &= ~((unsigned) eFaultUSB);
+            }
+            if (CTRL_CHECK_TIMEOUT(last_collision_time) &&
                 pHndl->mode == eModeAuto) {
-                pHndl->mode = eModeStalled;
+                pHndl->mode = eModeFault;
+                pHndl->faults |= eFaultLiDAR;
+            } else {
+                pHndl->faults &= ~((unsigned) eFaultLiDAR);
+            }
+            if (pHndl->rc_crsf.crsf.state != eCRSFOK) {
+                pHndl->mode = eModeFault;
+                pHndl->faults |= eFaultCRSF;
+            } else {
+                pHndl->faults &= ~((unsigned) eFaultCRSF);
             }
         } else if (pHndl->mode == eModeInit) {
-            // if (antigrav_checkstate(&pHndl->antigrav) ==
-            // eAntigravStateNormal)
             pHndl->mode = eModeStalled;
         }
 
-        // Read input data from the Jetson
-        static ctrl_vec_t cv_jetson = {0};
+        // Read input data from the USB interface
+        static ctrl_vec_t cv_usb = {0};
         struct udev_pkt_ctrl_tx udev_ctrl;
         if (xQueueReceive(pHndl->usb.tx, &udev_ctrl, 0) == pdTRUE) {
-            last_jetson_time = xTaskGetTickCount();
-            cv_jetson.x = (double) udev_ctrl.vel.x;
-            cv_jetson.y = (double) udev_ctrl.vel.y;
-            cv_jetson.z = (double) udev_ctrl.vel.z;
-            cv_jetson.w = (double) udev_ctrl.vel.w;
+            last_usb_time = xTaskGetTickCount();
+            cv_usb.x = (double) udev_ctrl.vel.x;
+            cv_usb.y = (double) udev_ctrl.vel.y;
+            cv_usb.z = (double) udev_ctrl.vel.z;
+            cv_usb.w = (double) udev_ctrl.vel.w;
         }
 
         static ctrl_state_t cs_collision = {0};
@@ -249,7 +266,6 @@ void vCtrlTsk(void *pvParams) {
         ctrl_vec_t cv_final = {0};
         switch (pHndl->mode) {
         case eModeInit:
-            // cv_final = antigrav_liftoff(&pHndl->antigrav, cs_collision.cv);
             break;
         case eModeRC:
             cv_final = ctrl_run_manual(pHndl);
@@ -264,7 +280,7 @@ void vCtrlTsk(void *pvParams) {
                                             cs_collision);
             break;
         case eModeAuto:
-            cv_final = ctrl_run_controllers(pHndl, cv_jetson, cs_collision);
+            cv_final = ctrl_run_controllers(pHndl, cv_usb, cs_collision);
             break;
         case eModeDisabled:
         case eModeFault:
@@ -290,8 +306,12 @@ void vCtrlTsk(void *pvParams) {
         fc_out.chan1 = crsf_unnormal(cv_final.y);
         fc_out.chan2 = crsf_unnormal(cv_final.z);
         fc_out.chan3 = crsf_unnormal(cv_final.w);
+        // Map the arming channel directly from the controller
         fc_out.chan4 = rc.chan4;
         crsf_write_rc(&pHndl->fc_crsf.crsf, &fc_out);
+
+        // Increment the heartbeat
+        pHndl->heartbeat++;
     }
 }
 
@@ -299,10 +319,12 @@ void vCtrlMonTsk(void *pvParams) {
     struct ctrl_tsk *const pHndl = pvParams;
     TickType_t last_wake_time = xTaskGetTickCount();
 
+    long int heartbeat_last = pHndl->heartbeat;
+
     for (;;) {
         // Ensure a consistent sample time delay
-        vTaskDelayUntil(&last_wake_time, 500);
-        printf("Ctrl Mode: ");
+        vTaskDelayUntil(&last_wake_time, CTRL_MON_TSK_RATE);
+        printf("CTRL: Mode->");
         switch (pHndl->mode) {
         case eModeDisabled:
             printf("Disabled\n");
@@ -325,6 +347,26 @@ void vCtrlMonTsk(void *pvParams) {
         case eModeFault:
             printf("Fault\n");
             break;
+        }
+
+        // Estimate the number of heartbeat ticks since last checkin
+        long int est_heartbeat =
+            heartbeat_last + (CTRL_MON_TSK_RATE / CTRL_TSK_RATE);
+        if (est_heartbeat != pHndl->heartbeat) {
+            printf("CTRL: Missed %ld Ticks\n",
+                   est_heartbeat - pHndl->heartbeat);
+        }
+        heartbeat_last = pHndl->heartbeat;
+
+        // Print out possible faults
+        if (pHndl->faults & eFaultCRSF) {
+            printf("CTRL: CRSF Timed Out\n");
+        }
+        if (pHndl->faults & eFaultUSB) {
+            printf("CTRL: USB Timed Out\n");
+        }
+        if (pHndl->faults & eFaultLiDAR) {
+            printf("CTRL: LiDAR Timed Out\n");
         }
     }
 }

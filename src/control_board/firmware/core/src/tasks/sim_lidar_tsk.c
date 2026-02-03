@@ -58,14 +58,14 @@ CtrlQueueHndl_t sim_lidar_tsk_init(struct sim_lidar_tsk *pHndl,
 void vSimLidarTsk(void *pvParams) {
     struct sim_lidar_tsk *pHndl = (struct sim_lidar_tsk *) pvParams;
 
-    printf("Gplan Online\n");
+    printf("SIMLDR: Online\n");
 
     for (;;) {
         // Attempt to pull the latest packet from the incoming process queue
         static struct udev_pkt_lidar ldrpkt = {0};
         if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 500) != pdTRUE) {
             // Input Queue Empty
-            printf("Lidar Input Queue Empty\n");
+            printf("SIMLDR: Input Queue Empty\n");
             continue;
         }
 

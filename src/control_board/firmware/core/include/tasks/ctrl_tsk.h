@@ -17,15 +17,24 @@
 #include "controllers/pid_controller.h"
 #include "drivers/serial.h"
 #include "protocols/crsf/crsf.h"
-#include "usb_cb_defs.h"
 #include "queue.h"
 #include "semphr.h"
 #include "stream_buffer.h"
+#include "usb_cb_defs.h"
 
 #include <stdio.h>
 
 #define CTRL_TSK_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
 
+#define CTRL_TSK_TIMEOUT 100
+#define CTRL_CHECK_TIMEOUT(last_time)                                          \
+    (xTaskGetTickCount() > (last_time + CTRL_TSK_TIMEOUT))
+
+// Main Loop Rate (ms)
+#define CTRL_TSK_RATE 5
+
+// Monitor Loop Rate (ms)
+#define CTRL_MON_TSK_RATE 500
 
 struct ctrl_tsk {
     struct {
@@ -51,11 +60,14 @@ struct ctrl_tsk {
     struct pid_controller pid_x;
     struct pid_controller pid_y;
     struct pid_controller pid_z;
-    // struct antigravity_controller antigrav;
 
     enum eCBMode mode;
+    enum eCBFault faults;
 
     QueueHandle_t col_rx;
+
+    // Control Task heartbeat
+    volatile long int heartbeat;
 };
 
 extern int ctrl_tsk_init(struct ctrl_tsk *pHndl,

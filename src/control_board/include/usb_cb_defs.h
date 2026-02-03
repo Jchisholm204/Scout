@@ -28,6 +28,14 @@ enum eCBStatus {
     eStatusBlocked,
 };
 
+enum eCBFault {
+    eFaultOK = 0U,
+    eFaultLiDAR = 1U,
+    eFaultCRSF = 2U,
+    eFaultUSB = 4U,
+    eFaultCollision = 8U,
+};
+
 enum eCBLidar {
     eLidarFront = 0U,
     eLidarVertical = 1U
