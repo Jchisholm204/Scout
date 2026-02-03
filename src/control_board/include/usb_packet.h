@@ -36,7 +36,6 @@ struct udev_pkt_ctrl_tx {
         };
         float data[4];
     } vel;
-    uint8_t mode;
 } __attribute__((packed, aligned(4)));
 
 struct udev_pkt_ctrl_rx {
@@ -46,6 +45,12 @@ struct udev_pkt_ctrl_rx {
         };
         float data[4];
     } vel;
+    union {
+        struct {
+            float x, y, z, w;
+        };
+        float data[4];
+    } cv;
     uint8_t vBatt;
     uint8_t rssi;
     uint8_t status;

@@ -12,22 +12,27 @@
 #ifndef _DRONE_DEFS_H_
 #define _DRONE_DEFS_H_
 #include "FreeRTOS.h"
+#include "os/math.h"
 #include "queue.h"
+
+#include <stdio.h>
 
 #define CTRL_BUF_SIZE 1
 
 // Control Vector Structure
 typedef union {
     struct {
-        float x, y, z, w;
+        double x, y, z, w;
     };
-    float data[4];
+    double data[4];
 } ctrl_vec_t;
 
 typedef struct {
     ctrl_vec_t cv;
+    ctrl_vec_t vel;
     float ground_distance;
     float ceil_distance;
+    float radius;
 } ctrl_state_t;
 
 typedef QueueHandle_t CtrlQueueHndl_t;
@@ -47,6 +52,35 @@ static inline CtrlQueueHndl_t xCtrlQueueCreateStatic(struct ctrl_queue *cq) {
                                   (uint8_t *) cq->storage_area,
                                   &cq->static_queue);
     return cq->hndl;
+}
+
+static inline ctrl_vec_t ctrl_vec_combine(ctrl_vec_t A,
+                                          ctrl_vec_t B,
+                                          float weight) {
+    if (weight < -1)
+        weight = -1;
+    if (weight > 1)
+        weight = 1;
+    ctrl_vec_t C;
+    for (int i = 0; i < 4; i++) {
+        C.data[i] = (A.data[i] * (double) weight) +
+                    (B.data[i] * (1.0 - (double) weight));
+    }
+    return C;
+}
+
+static inline ctrl_vec_t ctrl_vec_normal(ctrl_vec_t v) {
+    double sum = 0;
+    for (int i = 0; i < 4; i++)
+        sum += v.data[i] * v.data[i];
+    sum = (double)sqrtf((float)sum);
+    for (int i = 0; i < 4; i++)
+        v.data[i] = v.data[i] / sum;
+    return v;
+}
+
+static inline void ctrl_vec_print(const char *prefix, ctrl_vec_t v) {
+    printf("%s: %.3f %.3f %.3f %.3f\n", prefix, v.x, v.y, v.z, v.w);
 }
 
 #endif

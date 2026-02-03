@@ -21,7 +21,7 @@
 
 #define CRSF_CHANNEL_MIN 172
 #define CRSF_CHANNEL_ZERO 992
-#define CRSF_CHANNEL_MAX 1811
+#define CRSF_CHANNEL_MAX 1809
 
 enum eCRSFDataType {
     UINT8 = 0,
@@ -56,8 +56,9 @@ typedef struct {
 } crsf_gps_t;
 
 typedef struct {
+    // V
     float voltage;
-    // mA
+    // A
     float current;
     // mAh
     uint32_t capacity;

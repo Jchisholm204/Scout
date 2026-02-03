@@ -58,6 +58,7 @@ class Driver : public rclcpp::Node {
 
     // Control EP Callbacks
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _vel_cmd_pub;
+    rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _col_cmd_pub;
     rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr _battery_pub;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr _mode_pub;
     rclcpp::Publisher<std_msgs::msg::UInt8>::SharedPtr _status_pub;
