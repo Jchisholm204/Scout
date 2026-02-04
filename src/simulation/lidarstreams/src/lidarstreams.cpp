@@ -19,10 +19,12 @@
 #include <string.h>
 
 LidarStreams::LidarStreams() : Node("lidarstreams") {
-    this->declare_parameter("lidar_front_name", "lidar_front_frame");
-    this->declare_parameter("lidar_vertical_name", "lidar_vertical_frame");
+    this->declare_parameter("pub_prefix", "sim");
+    this->declare_parameter("lidar_front_name", "/ls_front");
+    this->declare_parameter("lidar_vertical_name", "/ls_vertical");
     this->declare_parameter("pub_rate", 50);
 
+    std::string pub_prefix = this->get_parameter("pub_prefix").as_string();
     std::string lidar_front_name = this->get_parameter("lidar_front_name").as_string();
     std::string lidar_vertical_name =
         this->get_parameter("lidar_vertical_name").as_string();
@@ -52,9 +54,10 @@ LidarStreams::LidarStreams() : Node("lidarstreams") {
     setsockopt(_udp_fp, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
 
     _ls_front_pub =
-        this->create_publisher<sensor_msgs::msg::LaserScan>(lidar_front_name, 10);
-    _ls_vertical_pub =
-        this->create_publisher<sensor_msgs::msg::LaserScan>(lidar_vertical_name, 10);
+        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_prefix + lidar_front_name,
+                                                            10);
+    _ls_vertical_pub = this->create_publisher<sensor_msgs::msg::LaserScan>(
+        pub_prefix + lidar_vertical_name, 10);
 
     _lidar_timer =
         this->create_wall_timer(std::chrono::milliseconds(pub_rate),

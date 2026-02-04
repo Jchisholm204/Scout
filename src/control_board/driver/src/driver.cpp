@@ -17,7 +17,7 @@ Driver::Driver() : Node("cb_driver") {
     std::string pub_base = this->get_parameter("publish_base").as_string();
     this->declare_parameter("ctrl_rate", 10);
     int ctrl_rate = this->get_parameter("ctrl_rate").as_int();
-    this->declare_parameter("lidar_rate", 50);
+    this->declare_parameter("lidar_rate", 20);
     int lidar_rate = this->get_parameter("lidar_rate").as_int();
 
     // Begin Libusb Initialization
@@ -43,16 +43,15 @@ Driver::Driver() : Node("cb_driver") {
 
     // BEGIN Lidar Interfaces
     _ls_front_pub =
-        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/out/ls_front",
-                                                            10);
+        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/ls_front", 10);
     _ls_vertical_pub =
-        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/out/ls_vertical",
+        this->create_publisher<sensor_msgs::msg::LaserScan>(pub_base + "/ls_vertical",
                                                             10);
     _ls_front_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "lidar_front_frame", 10,
+        "sim/ls_front", 10,
         std::bind(&Driver::_ls_front_callback, this, std::placeholders::_1));
     _ls_vertical_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
-        "lidar_vertical_frame", 10,
+        "sim/ls_vertical", 10,
         std::bind(&Driver::_ls_vertical_callback, this, std::placeholders::_1));
 
     _lidar_timer = this->create_wall_timer(std::chrono::milliseconds(lidar_rate),
@@ -76,15 +75,18 @@ Driver::Driver() : Node("cb_driver") {
 
     // BEGIN Control Interfaces
     _vel_cmd_pub =
-        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/out/vel", 10);
-    _col_cmd_pub =
-        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/out/col", 10);
-    _battery_pub =
-        this->create_publisher<sensor_msgs::msg::BatteryState>(pub_base + "/out/battery",
+        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/velocity",
                                                                10);
-    _mode_pub = this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/out/mode", 10);
-    _status_pub =
-        this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/out/status", 10);
+    _col_cmd_pub =
+        this->create_publisher<geometry_msgs::msg::Quaternion>(pub_base + "/col_vec", 10);
+    _battery_pub =
+        this->create_publisher<sensor_msgs::msg::BatteryState>(pub_base + "/battery", 10);
+    _mode_pub = this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/mode", 10);
+    _status_pub = this->create_publisher<std_msgs::msg::UInt8>(pub_base + "/status", 10);
+
+    _vel_cmd_sub = this->create_subscription<geometry_msgs::msg::Quaternion>(
+        pub_base + "/vel_cmd", 10,
+        std::bind(&Driver::_vel_callback, this, std::placeholders::_1));
 
     _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(ctrl_rate),
                                           std::bind(&Driver::_ctrl_callback, this));

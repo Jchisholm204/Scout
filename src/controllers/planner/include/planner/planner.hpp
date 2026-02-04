@@ -59,7 +59,7 @@ class Planner : public rclcpp::Node {
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
     void ctrl_callback(void);
 
-    geometry_msgs::msg::Quaternion _imu;
+    sensor_msgs::msg::Imu _imu;
     sensor_msgs::msg::BatteryState _battery;
     enum class eCBMode {
         eModeDisabled,
