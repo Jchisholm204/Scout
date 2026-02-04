@@ -7,3 +7,6 @@
 [submodule "PCB_Scout"]
 	path = PCB_Scout
 	url = https://github.com/jacquieg81/PCB_Scout.git
+[submodule "src/slg_msgs"]
+	path = src/slg_msgs
+	url = https://github.com/ajtudela/slg_msgs.git
