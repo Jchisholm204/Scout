@@ -7,5 +7,6 @@ endif()
 
 include(gravitational/build.cmake)
 include(planner/build.cmake)
+include(localization/build.cmake)
 
 ament_package()

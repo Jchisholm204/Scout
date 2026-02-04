@@ -1,8 +1,7 @@
-# INAV Bridge
-Handles communication with INAV over MSP
+# Gravitational Controller
+*Deprecated*
 
-> [!WARNING]
-> MSP library may fail to build due to `nullptr_t` being "undefined".
-> If so, change it to `std::nullptr_t`. Do not push this change upstream.
-> Unknown on why this error occurs. `nullptr_t` should be defined in C++14+.
+This node is the original gravitational object avoidance controller.
+It has been moved to the embedded subsystem.
+This node has been left here for reference purposes.
 
