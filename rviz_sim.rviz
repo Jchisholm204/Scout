@@ -211,6 +211,32 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /segments/visualization
       Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        detected_walls: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /wall_markers
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Marker
+      Namespaces:
+        gaps: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /open_markers
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -272,10 +298,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8097970485687256
+      Pitch: 0.6797971725463867
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.3865818977355957
+      Yaw: 3.5965840816497803
     Saved:
       - Class: rviz_default_plugins/Orbit
         Distance: 8.728776931762695

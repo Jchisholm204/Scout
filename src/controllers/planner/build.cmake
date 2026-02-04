@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(slg_msgs REQUIRED)
 
 # Gather all sources for this project
 file(GLOB_RECURSE PROJECT_SOURCES FOLLOW_SYMLINKS
@@ -17,7 +18,7 @@ file(GLOB_RECURSE PROJECT_SOURCES FOLLOW_SYMLINKS
 )
 
 # Setup Library Dependencies
-set(${NODE}_DEPS rclcpp std_msgs sensor_msgs tf2_ros visualization_msgs)
+set(${NODE}_DEPS rclcpp std_msgs sensor_msgs tf2_ros visualization_msgs slg_msgs)
 
 # Add to include directories
 include_directories(

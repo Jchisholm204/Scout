@@ -19,6 +19,7 @@
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <slg_msgs/msg/segment_array.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float32.h>
 #include <std_msgs/msg/float32.hpp>
@@ -46,6 +47,10 @@ class Planner : public rclcpp::Node {
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _horizontal_scan_sub;
     void _hldr_callback(const sensor_msgs::msg::LaserScan& ldr);
 
+    // LiDAR segmentation subscription
+    rclcpp::Subscription<slg_msgs::msg::SegmentArray>::SharedPtr _hldr_seg_sub;
+    void _hldr_seg_callback(const slg_msgs::msg::SegmentArray& seg_msg);
+
     // Positioning Subscriptions (either from sim or SLAM)
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr _pos_sub;
     void _pos_callback(const geometry_msgs::msg::Point& position);
@@ -54,6 +59,10 @@ class Planner : public rclcpp::Node {
 
     // ROS Message Publishers
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _movement_pub;
+
+    // Visualization Publishers
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _wall_marker_pub;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _open_marker_pub;
 
     // Runtime
     rclcpp::TimerBase::SharedPtr _ctrl_timer;

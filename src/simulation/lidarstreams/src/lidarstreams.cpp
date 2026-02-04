@@ -85,7 +85,7 @@ void LidarStreams::lidar_callback(void) {
     msg_front.angle_max = 2 * M_PI;
     msg_front.angle_min = 0;
     msg_front.range_max = 50.0;
-    msg_front.range_min = 0;
+    msg_front.range_min = 0.5;
     msg_front.header.stamp = this->now();
     msg_front.ranges.resize(N_POINTS);
     msg_front.intensities.resize(N_POINTS);
@@ -94,7 +94,7 @@ void LidarStreams::lidar_callback(void) {
     msg_vertical.angle_max = 2 * M_PI;
     msg_vertical.angle_min = 0;
     msg_vertical.range_max = 50.0;
-    msg_vertical.range_min = 0;
+    msg_vertical.range_min = 0.5;
     msg_vertical.header.stamp = this->now();
     msg_vertical.ranges.resize(N_POINTS);
     msg_vertical.intensities.resize(N_POINTS);
@@ -104,8 +104,14 @@ void LidarStreams::lidar_callback(void) {
 
     for (size_t i = 0; i < N_POINTS; i++) {
         msg_front.ranges[i] = (ldr_pkt.front[(N_POINTS - 1) - i]);
+        if(msg_front.ranges[i] < msg_front.range_min){
+            msg_front.ranges[i] = std::numeric_limits<float>::infinity();
+        }
         msg_front.intensities[i] = (1);
         msg_vertical.ranges[i] = (ldr_pkt.vertical[i]);
+        if(msg_vertical.ranges[i] < msg_vertical.range_min){
+            msg_vertical.ranges[i] = std::numeric_limits<float>::infinity();
+        }
         msg_vertical.intensities[i] = (1);
         if (ldr_pkt.front[i] < 45) {
             front_null = false;

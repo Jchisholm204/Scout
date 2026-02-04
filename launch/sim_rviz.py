@@ -33,13 +33,13 @@ def generate_launch_description():
             'segmentation_type': 'jump_distance_merge',
 
             # AGGRESSIVE MERGING (The "Error" Tolerance)
-            'distance_threshold': 0.4,       # Large gap tolerance between points
-            'max_distance_jump': 0.4,        # Merge segments even if they are far apart
+            'distance_threshold': 0.2,       # Large gap tolerance between points
+            'max_distance_jump': 0.25,        # Merge segments even if they are far apart
 
             # GENERIC FILTERING
-            'min_points_segment': 8,         # Accept even very "sparse" walls
+            'min_points_segment': 3,         # Accept even very "sparse" walls
             'max_points_segment': 500,       # Allow long continuous hallway walls
-            'min_segment_width': 0.2,        # Don't throw away small wall chunks
+            'min_segment_width': 0.05,        # Don't throw away small wall chunks
             'max_segment_width': 15.0,       # Capture the whole side of a long hall
 
             # RANGE (Generic Hallway)
