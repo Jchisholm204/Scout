@@ -71,6 +71,14 @@ def generate_launch_description():
             executable='lidarstreams',
             name='sim_lidar',
             ),
+        Node(
+            package='simulation',
+            executable='telemetry',
+            name='sim_telemetry',
+            parameters=[
+                {"pub_rate": 50}
+                ]
+            ),
         # Launch the driver board interface
         Node(
             package='control_board',
