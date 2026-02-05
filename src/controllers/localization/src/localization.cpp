@@ -13,7 +13,6 @@
 
 #include <cmath>
 #include <math.h>
-#include <slg_msgs/msg/segment_array.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <unistd.h>
 

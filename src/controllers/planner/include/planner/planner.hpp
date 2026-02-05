@@ -41,15 +41,11 @@ class Planner : public rclcpp::Node {
     rclcpp::Subscription<std_msgs::msg::UInt8>::SharedPtr _mode_sub;
     void _mode_callback(const std_msgs::msg::UInt8& mode);
 
-    // LiDAR data Subscriptions (either from sim or USB IF)
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _vertical_scan_sub;
-    void _vldr_callback(const sensor_msgs::msg::LaserScan& ldr);
-    rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _horizontal_scan_sub;
-    void _hldr_callback(const sensor_msgs::msg::LaserScan& ldr);
-
     // LiDAR segmentation subscription
-    rclcpp::Subscription<slg_msgs::msg::SegmentArray>::SharedPtr _hldr_seg_sub;
-    void _hldr_seg_callback(const slg_msgs::msg::SegmentArray& seg_msg);
+    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr _wall_marker_sub;
+    void _wall_marker_callback(const visualization_msgs::msg::Marker& msg);
+    rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr _open_marker_sub;
+    void _open_marker_callback(const visualization_msgs::msg::Marker& msg);
 
     // Positioning Subscriptions (either from sim or SLAM)
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr _pos_sub;
@@ -59,10 +55,6 @@ class Planner : public rclcpp::Node {
 
     // ROS Message Publishers
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _movement_pub;
-
-    // Visualization Publishers
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _wall_marker_pub;
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _open_marker_pub;
 
     // Runtime
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
@@ -79,8 +71,8 @@ class Planner : public rclcpp::Node {
         eModeStalled,
         eModeFault
     } _mode;
-    sensor_msgs::msg::LaserScan _front_lidar;
-    sensor_msgs::msg::LaserScan _vertical_lidar;
+    visualization_msgs::msg::Marker _wall_markers;
+    visualization_msgs::msg::Marker _open_markers;
     geometry_msgs::msg::Point _position;
     geometry_msgs::msg::Vector3 _velocity;
 };
