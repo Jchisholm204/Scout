@@ -11,17 +11,24 @@
 
 #include "localization/localization.hpp"
 
+#include <cmath>
+#include <math.h>
+#include <slg_msgs/msg/segment_array.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <unistd.h>
 
 Localization::Localization() : Node("ldr_local") {
-    this->declare_parameter("vert_lidar_topic", "cb/ls_vertical");
-    this->declare_parameter("front_lidar_topic", "cb/ls_front");
+    this->declare_parameter("vert_lidar_topic", "sim/ls_vertical");
+    this->declare_parameter("front_lidar_topic", "sim/ls_front");
     this->declare_parameter("ldr_segment_topic", "/segments");
+    this->declare_parameter("line_gap_thresh", _line_gap_thresh);
+    this->declare_parameter("line_angle_thresh", _line_angle_thresh);
 
     std::string vert_lidar_topic = this->get_parameter("vert_lidar_topic").as_string();
     std::string front_lidar_topic = this->get_parameter("front_lidar_topic").as_string();
     std::string ldr_segment_topic = this->get_parameter("ldr_segment_topic").as_string();
+    _line_gap_thresh = this->get_parameter("line_gap_thresh").as_double();
+    _line_angle_thresh = this->get_parameter("line_angle_thresh").as_double();
 
     // Create Subscriptions to drone topics
     _vertical_scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -30,9 +37,6 @@ Localization::Localization() : Node("ldr_local") {
     _horizontal_scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>(
         front_lidar_topic, 10,
         std::bind(&Localization::_hldr_callback, this, std::placeholders::_1));
-    _hldr_seg_sub = this->create_subscription<slg_msgs::msg::SegmentArray>(
-        ldr_segment_topic, 10,
-        std::bind(&Localization::_hldr_seg_callback, this, std::placeholders::_1));
 
     // Create Publishers
     _wall_marker_pub =
@@ -49,75 +53,115 @@ void Localization::_vldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
 }
 
 void Localization::_hldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
-    (void) ldr;
+    visualization_msgs::msg::Marker walls = _process_ldr(ldr);
+    this->_wall_marker_pub->publish(walls);
 }
 
-void Localization::_hldr_seg_callback(const slg_msgs::msg::SegmentArray& seg_msg) {
-    const auto& segments = seg_msg.segments;
-    if (segments.empty())
-        return;
+visualization_msgs::msg::Marker Localization::_process_ldr(
+    const sensor_msgs::msg::LaserScan& ldr) {
+    visualization_msgs::msg::Marker walls;
+    walls.header = ldr.header;
+    walls.ns = "detected_walls";
+    walls.id = 0;
+    walls.type = visualization_msgs::msg::Marker::LINE_LIST;
+    walls.scale.x = 0.05;
+    walls.color.r = 1.0;
+    walls.color.a = 1.0;
 
-    // 1. Setup Red Markers (Walls)
-    visualization_msgs::msg::Marker wall_list;
-    wall_list.header = seg_msg.header;
-    wall_list.ns = "detected_walls";
-    wall_list.id = 0;
-    wall_list.type = visualization_msgs::msg::Marker::LINE_LIST;
-    wall_list.scale.x = 0.05;
-    wall_list.color.r = 1.0;
-    wall_list.color.a = 1.0;
+    geometry_msgs::msg::Point start, first_pt;
+    bool segment_started = false;
+    bool first_point_captured = false;
+    float range_last = 0.0, first_range = 0.0;
+    int last_valid_idx = 0;
 
-    // 2. Setup Green Markers (Gaps/Openings)
-    visualization_msgs::msg::Marker gap_list;
-    gap_list.header = seg_msg.header;
-    gap_list.ns = "gaps";
-    gap_list.id = 1;
-    gap_list.type = visualization_msgs::msg::Marker::LINE_LIST;
-    gap_list.scale.x = 0.03;
-    gap_list.color.g = 1.0;
-    gap_list.color.a = 0.8;
+    for (size_t i = 0; i < ldr.ranges.size(); i++) {
+        float range = ldr.ranges[i];
 
-    size_t num_segments = segments.size();
-
-    for (size_t i = 0; i < num_segments; ++i) {
-        if (segments[i].points.size() < 2)
+        // 1. VALIDATION CHECK
+        if (!std::isfinite(range) || range < ldr.range_min || range > ldr.range_max) {
+            // We do NOT reset segment_started yet. 
+            // We just skip this index and try to connect the next valid one.
             continue;
+        }
 
-        // --- DRAW THE CURRENT WALL (Line A) ---
-        geometry_msgs::msg::Point pA_start, pA_end;
-        pA_start.x = segments[i].points.front().x;
-        pA_start.y = segments[i].points.front().y;
-        pA_end.x = segments[i].points.back().x;
-        pA_end.y = segments[i].points.back().y;
+        // Calculate current point coordinates
+        geometry_msgs::msg::Point current_pt;
+        float angle = ldr.angle_min + (i * ldr.angle_increment);
+        current_pt.x = range * cos(angle);
+        current_pt.y = range * sin(angle);
+        current_pt.z = 0;
 
-        wall_list.points.push_back(pA_start);
-        wall_list.points.push_back(pA_end);
+        if (!first_point_captured) {
+            first_pt = current_pt;
+            first_range = range;
+            first_point_captured = true;
+        }
 
-        // --- BRIDGE TO THE NEXT WALL (The "Loop Around" Logic) ---
-        // (i + 1) % num_segments creates the wrap-around from last back to first
-        size_t next_idx = (i + 1) % num_segments;
+        // 2. SEGMENT INITIALIZATION
+        if (!segment_started) {
+            start = current_pt;
+            range_last = range;
+            last_valid_idx = i;
+            segment_started = true;
+            continue;
+        }
 
-        if (segments[next_idx].points.size() >= 2) {
-            geometry_msgs::msg::Point pB_start;
-            pB_start.x = segments[next_idx].points.front().x;
-            pB_start.y = segments[next_idx].points.front().y;
+        // 3. GEOMETRY MATH
+        // Since we might have skipped points, we need the actual angle difference
+        int steps = i - last_valid_idx;
+        float angle_diff = steps * ldr.angle_increment;
+        float cos_diff = cos(angle_diff);
+        float sin_diff = sin(angle_diff);
 
-            // Calculate the distance of the "Gap"
-            double dist = std::sqrt(std::pow(pB_start.x - pA_end.x, 2) +
-                                    std::pow(pB_start.y - pA_end.y, 2));
+        float range_last_2 = range_last * range_last;
+        float range_2 = range * range;
 
-            // Only bridge if it's a meaningful gap (e.g., > 0.4m for drone passage)
-            // If it's too small, it's just a corner; if it's huge, it's a hallway.
-            if (dist > 1.2) {
-                gap_list.points.push_back(pA_end);   // Last point of current line
-                gap_list.points.push_back(pB_start); // First point of NEXT line
-            } else {
-                wall_list.points.push_back(pA_end);   // Last point of current line
-                wall_list.points.push_back(pB_start); // First point of NEXT line
+        // Law of Cosines using the actual angle difference
+        float line_gap = sqrt(std::max(0.0f, (range_2 + range_last_2) - 
+                                             (2 * range * range_last * cos_diff)));
+
+        // 4. BREAK CONDITIONS
+        if (line_gap > _line_gap_thresh) {
+            // Even if we skip invalid points, the resulting gap is too wide.
+            // Reset the segment to start here.
+            start = current_pt;
+        } else {
+            // For the angle threshold, we use the specific sin of this jump
+            float line_angle = asin((range * sin_diff) / std::max(line_gap, 0.001f));
+
+            if (line_angle > _line_angle_thresh) {
+                walls.points.push_back(start);
+                walls.points.push_back(current_pt);
+                start = current_pt;
             }
+        }
+
+        range_last = range;
+        last_valid_idx = i;
+    }
+
+    // --- WRAP AROUND LOGIC ---
+    // If the last point of the scan and the first point of the scan are both valid
+    if (segment_started && first_point_captured) {
+
+        // Calculate the gap between the last point (range_last) and the first
+        // (first_range) The angle between them is usually the ldr.angle_increment (or 2pi
+        // - total_angle)
+        float cos_inc = cos(ldr.angle_increment);
+        float range_2 = first_range * first_range;
+        float range_last_2 = range_last * range_last;
+
+        float wrap_gap =
+            sqrt(std::max(0.0f, (range_2 + range_last_2) -
+                                    (2 * first_range * range_last * cos_inc)));
+
+        // Only connect if they are close enough to be the same wall
+        if (wrap_gap < _line_gap_thresh) {
+            walls.points.push_back(start);    // From the last "start" marker
+            walls.points.push_back(first_pt); // Back to the very beginning
         }
     }
 
-    _wall_marker_pub->publish(wall_list);
-    _open_marker_pub->publish(gap_list);
+    return walls;
 }
+

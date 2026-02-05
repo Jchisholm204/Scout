@@ -1,14 +1,13 @@
 /**
  * @file localization.hpp
  * @author Jacob Chisholm (https://Jchisholm204.github.io)
- * @brief 
+ * @brief
  * @version 0.1
  * @date Created: 2026-02-04
  * @modified Last Modified: 2026-02-04
  *
  * @copyright Copyright (c) 2026
  */
-
 
 #ifndef _LOCALIZATION_HPP_
 #define _LOCALIZATION_HPP_
@@ -20,7 +19,6 @@
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <slg_msgs/msg/segment_array.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float32.h>
 #include <std_msgs/msg/float32.hpp>
@@ -28,7 +26,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <visualization_msgs/msg/marker.hpp>
 
-class Localization: public rclcpp::Node {
+class Localization : public rclcpp::Node {
   public:
     Localization();
     ~Localization();
@@ -40,13 +38,18 @@ class Localization: public rclcpp::Node {
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr _horizontal_scan_sub;
     void _hldr_callback(const sensor_msgs::msg::LaserScan& ldr);
 
-    // LiDAR segmentation subscription
-    rclcpp::Subscription<slg_msgs::msg::SegmentArray>::SharedPtr _hldr_seg_sub;
-    void _hldr_seg_callback(const slg_msgs::msg::SegmentArray& seg_msg);
+    visualization_msgs::msg::Marker _process_ldr(const sensor_msgs::msg::LaserScan& ldr);
 
     // Visualization Publishers
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _wall_marker_pub;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _open_marker_pub;
+
+    // Constant time loop to publish data
+    rclcpp::TimerBase::SharedPtr _ctrl_timer;
+    void _ctrl_callback(void);
+
+    float _line_gap_thresh = 2;
+    float _line_angle_thresh = 0.8;
 };
 
 #endif
