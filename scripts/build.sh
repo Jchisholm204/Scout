@@ -6,7 +6,7 @@
 # It can be changed to bash by modifying the top line
 
 # PKGS_COMMON=("joystick_controller" "interfaces")
-PKGS_COMMON=("interfaces" "controllers" "control_board" "simulation")
+PKGS_COMMON=("interfaces" "controllers" "control_board" "simulation" "laser_segmentation" "slg_msgs")
 PKGS_JETSON=()
 
 HOSTNAME_JETSON="jetson"
@@ -28,7 +28,7 @@ build() {
 
 
     # Build the packages
-    colcon build --packages-select "$@" --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug
+    colcon build --packages-select "$@" --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=OFF -Wno-dev
 
     # Source Install
     if [[ -f "./install/local_setup.zsh" ]]; then

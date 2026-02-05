@@ -11,7 +11,7 @@
 
 #include "driver/driver.hpp"
 
-int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMode mode) {
+int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt) {
     struct udev_pkt_ctrl_tx pkt;
     pkt.vel.x = qt.x;
     pkt.vel.y = qt.y;
@@ -80,10 +80,6 @@ void Driver::_ctrl_callback(void) {
     _col_cmd_pub->publish(qt);
 }
 
-void Driver::_mode_callback(std_msgs::msg::UInt8& new_mode) {
-    _new_mode = (enum eCBMode) new_mode.data;
-}
-
 void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
     if (!_usb_connected() || !_lusb_hndl) {
         RCLCPP_ERROR(this->get_logger(), "USB Not Connected");
@@ -92,5 +88,5 @@ void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
             return;
         }
     }
-    _usb_send_ctrl(qt, _new_mode);
+    _usb_send_ctrl(qt);
 }

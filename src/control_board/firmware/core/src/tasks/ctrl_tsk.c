@@ -124,7 +124,7 @@ ctrl_vec_t ctrl_run_controllers(struct ctrl_tsk *const pHndl,
     double dt = ((double) xTaskGetTickCount() - (double) last_wake_time) /
                 (double) configTICK_RATE_HZ;
     if (dt <= 0.000001) {
-        dt = ((double) CTRL_TSK_RATE) / 1000.0;
+        dt = (((double) CTRL_TSK_RATE) / 1000.0);
     }
     pid_z =
         smooth(pidc_calculate(&pHndl->pid_z, 0, (double) -cv_colsn.cv.z, dt),
@@ -224,20 +224,20 @@ void vCtrlTsk(void *pvParams) {
                 break;
             }
             if (CTRL_CHECK_TIMEOUT(last_usb_time) && pHndl->mode == eModeAuto) {
-                pHndl->mode = eModeFault;
+                // pHndl->mode = eModeFault;
                 pHndl->faults |= eFaultUSB;
             } else {
                 pHndl->faults &= ~((unsigned) eFaultUSB);
             }
             if (CTRL_CHECK_TIMEOUT(last_collision_time) &&
                 pHndl->mode == eModeAuto) {
-                pHndl->mode = eModeFault;
+                // pHndl->mode = eModeFault;
                 pHndl->faults |= eFaultLiDAR;
             } else {
                 pHndl->faults &= ~((unsigned) eFaultLiDAR);
             }
             if (pHndl->rc_crsf.crsf.state != eCRSFOK) {
-                pHndl->mode = eModeFault;
+                // pHndl->mode = eModeFault;
                 pHndl->faults |= eFaultCRSF;
             } else {
                 pHndl->faults &= ~((unsigned) eFaultCRSF);
