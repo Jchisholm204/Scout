@@ -55,6 +55,30 @@ void Localization::_vldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
 void Localization::_hldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
     visualization_msgs::msg::Marker walls = _process_ldr(ldr);
     this->_wall_marker_pub->publish(walls);
+    visualization_msgs::msg::Marker open;
+    open.header = walls.header;
+    open.ns = "open_space";
+    open.id = 0;
+    open.type = visualization_msgs::msg::Marker::LINE_LIST;
+    open.scale.x = 0.05;
+    open.color.g = 1.0;
+    open.color.a = 1.0;
+    geometry_msgs::msg::Point last = walls.points[0];
+    for (size_t i = 0; i + 3 < walls.points.size(); i += 2) {
+    const auto& p_end_current = walls.points[i+1];
+    const auto& p_start_next = walls.points[i+2];
+
+    // Calculate distance between segments
+    float dx = p_start_next.x - p_end_current.x;
+    float dy = p_start_next.y - p_end_current.y;
+    float gap_dist = sqrt(dx*dx + dy*dy);
+
+    if (gap_dist > _line_gap_thresh) {
+        open.points.push_back(p_end_current);
+        open.points.push_back(p_start_next);
+    }
+}
+    this->_open_marker_pub->publish(open);
 }
 
 visualization_msgs::msg::Marker Localization::_process_ldr(
