@@ -10,3 +10,6 @@
 [submodule "src/slg_msgs"]
 	path = src/slg_msgs
 	url = https://github.com/ajtudela/slg_msgs.git
+[submodule "src/slam"]
+	path = src/slam
+	url = https://github.com/EricHaden/capstone.git
