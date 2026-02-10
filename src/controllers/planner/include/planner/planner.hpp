@@ -14,6 +14,8 @@
 
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/transform_stamped.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/vector3.h>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/battery_state.hpp>
@@ -26,6 +28,10 @@
 #include <std_msgs/msg/u_int8.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <visualization_msgs/msg/marker.hpp>
+#include <vector>
+
+#include <nanoflann.hpp>
+
 
 class Planner : public rclcpp::Node {
   public:
@@ -53,6 +59,10 @@ class Planner : public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::Vector3>::SharedPtr _vel_sub;
     void _vel_callback(const geometry_msgs::msg::Vector3& velocity);
 
+    // SLAM Subscription
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _slam_sub;
+    void _slam_callback(const geometry_msgs::msg::PoseStamped& msg);
+
     // ROS Message Publishers
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _movement_pub;
 
@@ -75,6 +85,20 @@ class Planner : public rclcpp::Node {
     visualization_msgs::msg::Marker _open_markers;
     geometry_msgs::msg::Point _position;
     geometry_msgs::msg::Vector3 _velocity;
+    geometry_msgs::msg::Quaternion _orientation;
+    geometry_msgs::msg::Point _position_abs;
+    geometry_msgs::msg::Quaternion _orientation_abs;
+
+
+    //init nanoflann kd tree "waypoints", which holds 3D points
+    // nanoflann::tree waypoints;
+    std::vector<geometry_msgs::msg::Point> latest_midpoints_D;
+
+    geometry_msgs::msg::Point current_waypoint;
+
+    geometry_msgs::msg::Point convert_DCS_to_WCS(geometry_msgs::msg::Point waypoint_DCS, geometry_msgs::msg::Point position, geometry_msgs::msg::Quaternion orientation);
+    void update_waypoint(void);
+
 };
 
 #endif
