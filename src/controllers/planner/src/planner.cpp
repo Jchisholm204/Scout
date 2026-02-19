@@ -131,20 +131,20 @@ void Planner::_slam_callback(const geometry_msgs::msg::PoseStamped& msg) {
     this->_orientation_abs = msg.pose.orientation;
 }
 
-geometry_msgs::msg::Point Planner::convert_DCS_to_WCS(geometry_msgs::msg::Point waypoint_DCS, geometry_msgs::msg::Point position, geometry_msgs::msg::Quaternion orientation){
+geometry_msgs::msg::Point Planner::convert_DCS_to_WCS(geometry_msgs::msg::Point waypoint_DCS, geometry_msgs::msg::Point position){
     tf2::Vector3 translation(position.x, position.y, position.z);
-    tf2::Quaternion rotation;
-    tf2::fromMsg(orientation, rotation);
+    // tf2::Quaternion rotation;
+    // tf2::fromMsg(orientation, rotation);
 
-    tf2::Transform transform_W_D;
-    transform_W_D.setOrigin(translation);
-    transform_W_D.setRotation(rotation);
+    // tf2::Transform transform_W_D;
+    // transform_W_D.setOrigin(translation);
+    // transform_W_D.setRotation(rotation);
 
     //assuming x,y,0
     tf2::Vector3 waypoint(waypoint_DCS.x, waypoint_DCS.y, waypoint_DCS.z);
 
     //assuming order is correct for waypoint
-    tf2::Vector3 waypoint_WCS = transform_W_D * waypoint;
+    tf2::Vector3 waypoint_WCS = translation + waypoint;
     
     geometry_msgs::msg::Point p;
     p.x = waypoint_WCS.x();
@@ -158,7 +158,7 @@ void Planner::update_waypoint(void) {
     if (!latest_midpoints_D.empty()) { //critical condition else downstream logic breaks
         //convert to WCS and add to tree
         for (const auto& marker_midpoint_D : latest_midpoints_D){
-            geometry_msgs::msg::Point waypoint_W = convert_DCS_to_WCS(marker_midpoint_D, _position_abs, _orientation_abs);
+            geometry_msgs::msg::Point waypoint_W = convert_DCS_to_WCS(marker_midpoint_D, _position_abs);
             if( waypoint_W.x > _position_abs.x ) { //CHECK THAT IT'S THE X COORD - DEPENDS ON WCS ORIENTATION IN SPACE
                 //add elements to waypoints tree "waypoints"
                 // waypoints.add(waypoint_W)
