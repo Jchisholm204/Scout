@@ -37,10 +37,12 @@ typedef enum {
 typedef struct {
     uint8_t start_flag1; // 0xA5
     uint8_t start_flag2; // 0x5A
-    uint32_t data_response_length; // 30bits for data length in bytes, 2bits for send mode: 00 for single response, 01 for multiple response
+    uint32_t data_response_length; // 30bits for data length in bytes
     uint8_t send_mode; // 2bits for send mode: 00 for single response, 01 for multiple response
     uint8_t data_type; 
 } RpLidarResponseDescriptor;
+
+#define RPLIDAR_RESPONSE_DESCRIPTOR ((RpLidarResponseDescriptor){.start_flag1=0xA5, .start_flag2=0x5A, .data_response_length=0, .send_mode=0, .data_type=0})
 
 typedef struct {
     uint8_t major_model;
@@ -51,7 +53,15 @@ typedef struct {
     uint8_t serialnumber[16];
 } RpLidarDeviceInfo;
 
-#define RPLIDAR_RESPONSE_DESCRIPTOR ((RpLidarResponseDescriptor){.start_flag1=0xA5, .start_flag2=0x5A, .data_response_length=0, .send_mode=0, .data_type=0})
+typedef struct {
+    uint8_t status; // 0: Good 1: Warning 2: Error
+    uint16_t error_code;
+} RpLidarDeviceHealth;
+
+typedef struct {
+    uint16_t Tstandard; // unit: microsecond
+    uint16_t Texpress; // unit: microsecond
+} RpLidarSampleRate;
 
 typedef struct {
     float angle;

@@ -25,6 +25,14 @@ void parse_RpLidarDeviceInfo(RpLidarDeviceInfo *di, uint8_t *bytes) {
     di->sub_model = bytes[0] & 0x0F;
     memcpy(&(di->firmware_minor), bytes+1, sizeof(RpLidarDeviceInfo)-2);
 }
+void parse_RpLidarDeviceHealth(RpLidarDeviceHealth *dh, uint8_t *bytes) {
+    dh->status = bytes[0];
+    dh->error_code = bytes[1] | (bytes[2] << 8);
+}
+void parse_RpLidarSampleRate(RpLidarSampleRate *sr, uint8_t *bytes) {
+    sr->Tstandard = bytes[0] | (bytes[1] << 8);
+    sr->Texpress = bytes[2] | (bytes[3] << 8);
+}
 
 void vRpLidar_tsk(void* pvParams);
 
@@ -99,6 +107,8 @@ void vRpLidar_tsk(void* pvParams){
     if (!pHndl) {
         vTaskSuspend(NULL);
     }
+    char request[16];
+    uint8_t response[32];
     // send a GET_INFO request
     // output to stdout in debug mode to see sent request
     // wait
@@ -108,8 +118,6 @@ void vRpLidar_tsk(void* pvParams){
     // receive GET_INFO data response
     // output to stdout in debug mode to see response
     
-    char request[16];
-    uint8_t response[32];
     request[0] = 0xA5;
     request[1] = 0x50;
     if (serial_write(pHndl->pSerial, request, 2, 10) != eSerialOK){
@@ -140,7 +148,7 @@ void vRpLidar_tsk(void* pvParams){
     printf("    send_mode: %X\n", get_info_response_descriptor.send_mode);
     printf("    data_type: %X\n", get_info_response_descriptor.data_type);
 
-    uint32_t data_response_length = get_info_response_descriptor.data_response_length & 0xFFFFFFFC;
+    uint32_t data_response_length = get_info_response_descriptor.data_response_length;
     printf("reading %lu bytes from Serial3:\n", data_response_length);
     for (uint32_t i = 0; i < data_response_length;) {
         if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
@@ -152,14 +160,6 @@ void vRpLidar_tsk(void* pvParams){
     RpLidarDeviceInfo device_info;
     parse_RpLidarDeviceInfo(&device_info, response);
 
-// typedef struct {
-//     uint8_t major_model;
-//     uint8_t sub_model;
-//     uint8_t firmware_minor;
-//     uint8_t firmware_major;
-//     uint8_t hardware;
-//     uint8_t serialnumber[16];
-// } RpLidarDeviceInfo;
     printf("device_info:\n");
     printf("    major_model: %X\n", device_info.major_model);
     printf("    sub_model: %X\n", device_info.sub_model);
@@ -191,8 +191,147 @@ void vRpLidar_tsk(void* pvParams){
     // wait
     // receive GET_HEALTH 
 
+    request[0] = 0xA5;
+    request[1] = 0x52;
+    if (serial_write(pHndl->pSerial, request, 2, 10) != eSerialOK){
+        printf("cannot write GET_HEALTH request to Serial3\n");
+    }
+    printf("wrote GET_HEALTH request to Serial3\n");
 
+    printf("reading from Serial3:\n");
+    for (int i = 0; i < 7;) {
+        if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
+            printf("byte %d: %X\n", i, response[i]);
+            i++;
+        }
+    }
     
+    if (!(response[0]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag1 && response[1]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag2)) {
+        printf("format error on RPLidar response");
+    }
+    printf("GET_HEALTH response descriptor: %X %X %X %X %X %X %X\n", response[0], response[1], response[2], response[3], response[4], response[5], response[6]);
+
+    RpLidarResponseDescriptor get_health_response_descriptor;
+    parse_RpLidarResponseDescriptor(&get_health_response_descriptor, response);
+    // print stuff from get_health_response_descriptor to make sure we are parsing correctly
+    printf("get_health_response_descriptor:\n");
+    printf("    start_flag1: %X\n", get_health_response_descriptor.start_flag1);
+    printf("    start_flag2: %X\n", get_health_response_descriptor.start_flag2);
+    printf("    data_response_length: %lu\n", get_health_response_descriptor.data_response_length);
+    printf("    send_mode: %X\n", get_health_response_descriptor.send_mode);
+    printf("    data_type: %X\n", get_health_response_descriptor.data_type);
+
+    data_response_length = get_health_response_descriptor.data_response_length;
+    printf("reading %lu bytes from Serial3:\n", data_response_length);
+    for (uint32_t i = 0; i < data_response_length;) {
+        if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
+            printf("byte %lu: %X\n", i, response[i]);
+            i++;
+        }
+    }
+    
+    RpLidarDeviceHealth device_health;
+    parse_RpLidarDeviceHealth(&device_health, response);
+
+
+    printf("device_health:\n");
+    printf("    status: %X\n", device_health.status);
+    printf("    error_code: %X\n", device_health.error_code);
+    
+
+    // send a GET_SAMPLERATE request
+    // wait
+    // receive GET_SAMPLERATE response descriptor
+    // wait
+    // receive GET_SAMPLERATE 
+
+    request[0] = 0xA5;
+    request[1] = 0x59;
+    if (serial_write(pHndl->pSerial, request, 2, 10) != eSerialOK){
+        printf("cannot write GET_SAMPLERATE request to Serial3\n");
+    }
+    printf("wrote GET_SAMPLERATE request to Serial3\n");
+
+    printf("reading from Serial3:\n");
+    for (int i = 0; i < 7;) {
+        if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
+            printf("byte %d: %X\n", i, response[i]);
+            i++;
+        }
+    }
+    
+    if (!(response[0]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag1 && response[1]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag2)) {
+        printf("format error on RPLidar response");
+    }
+    printf("GET_SAMPLERATE response descriptor: %X %X %X %X %X %X %X\n", response[0], response[1], response[2], response[3], response[4], response[5], response[6]);
+
+    RpLidarResponseDescriptor get_samplerate_response_descriptor;
+    parse_RpLidarResponseDescriptor(&get_samplerate_response_descriptor, response);
+    // print stuff from get_samplerate_response_descriptor to make sure we are parsing correctly
+    printf("get_samplerate_response_descriptor:\n");
+    printf("    start_flag1: %X\n", get_samplerate_response_descriptor.start_flag1);
+    printf("    start_flag2: %X\n", get_samplerate_response_descriptor.start_flag2);
+    printf("    data_response_length: %lu\n", get_samplerate_response_descriptor.data_response_length);
+    printf("    send_mode: %X\n", get_samplerate_response_descriptor.send_mode);
+    printf("    data_type: %X\n", get_samplerate_response_descriptor.data_type);
+
+    data_response_length = get_samplerate_response_descriptor.data_response_length;
+    printf("reading %lu bytes from Serial3:\n", data_response_length);
+    for (uint32_t i = 0; i < data_response_length;) {
+        if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
+            printf("byte %lu: %X\n", i, response[i]);
+            i++;
+        }
+    }
+    
+    RpLidarSampleRate sample_rate;
+    parse_RpLidarSampleRate(&sample_rate, response);
+
+    printf("sample_rate:\n");
+    printf("    Tstandard: %u\n", sample_rate.Tstandard);
+    printf("    Texpress: %u\n", sample_rate.Texpress);
+
+    // optional: do GET_LIDAR_CONF requests for each configuration entry.
+    // configuration entries: 0x70, 0x71, 0x74, 0x75, 0x7C, 0x7F. 
+    // see page 30 in the protocol documentation for info.
+
+    // send a START_SCAN request
+    // wait
+    // receive START_SCAN response descriptor
+    // wait
+    // receive START_SCAN 
+    request[0] = 0xA5;
+    request[1] = 0x20;
+    if (serial_write(pHndl->pSerial, request, 2, 10) != eSerialOK){
+        printf("cannot write START_SCAN request to Serial3\n");
+    }
+    printf("wrote START_SCAN request to Serial3\n");
+
+    printf("reading from Serial3:\n");
+    for (int i = 0; i < 7;) {
+        if (xStreamBufferReceive(pHndl->rx_hndl, response+i, 1, 10)) {
+            printf("byte %d: %X\n", i, response[i]);
+            i++;
+        }
+    }
+    
+    if (!(response[0]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag1 && response[1]==RPLIDAR_RESPONSE_DESCRIPTOR.start_flag2)) {
+        printf("format error on RPLidar response");
+    }
+    printf("START_SCAN response descriptor: %X %X %X %X %X %X %X\n", response[0], response[1], response[2], response[3], response[4], response[5], response[6]);
+
+    RpLidarResponseDescriptor start_scan_response_descriptor;
+    parse_RpLidarResponseDescriptor(&start_scan_response_descriptor, response);
+    // print stuff from get_samplerate_response_descriptor to make sure we are parsing correctly
+    printf("get_samplerate_response_descriptor:\n");
+    printf("    start_flag1: %X\n", start_scan_response_descriptor.start_flag1);
+    printf("    start_flag2: %X\n", start_scan_response_descriptor.start_flag2);
+    printf("    data_response_length: %lu\n", start_scan_response_descriptor.data_response_length);
+    printf("    send_mode: %X\n", start_scan_response_descriptor.send_mode);
+    printf("    data_type: %X\n", start_scan_response_descriptor.data_type);
+
+    // need to send a RESET or STOP_SCAN request to stop the device
+
     TickType_t last_wake_time = xTaskGetTickCount();
     for (;;) {
         printf("vRpLidar_tsk\n");
