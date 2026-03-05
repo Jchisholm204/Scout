@@ -47,7 +47,7 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
     // Init RpLidar Task
     pHndl->tsk_hndl = xTaskCreateStatic(vRpLidar_tsk,
                                         "RPLDR",
-                                        configMINIMAL_STACK_SIZE,
+                                        RPLIDAR_STACK_SIZE,
                                         (void*) pHndl,
                                         configMAX_PRIORITIES - 3,
                                         pHndl->tsk_stack,

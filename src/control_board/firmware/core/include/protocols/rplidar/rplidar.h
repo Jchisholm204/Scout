@@ -23,6 +23,8 @@
 
 #define RPLIDAR_BUF_LEN 1000
 
+#define RPLIDAR_STACK_SIZE (configMINIMAL_STACK_SIZE << 2)
+
 typedef enum {
     eRpLidarOK,
     eRpLidarNULL,
@@ -151,7 +153,7 @@ typedef struct {
     // Task information (Maybe not needed)
     TaskHandle_t tsk_hndl;
     StaticTask_t tsk_buf;
-    StackType_t tsk_stack[configMINIMAL_STACK_SIZE];
+    StackType_t tsk_stack[RPLIDAR_STACK_SIZE];
 
     // Recieve Buffer (from serial driver interrupt)
     StreamBufferHandle_t rx_hndl;
