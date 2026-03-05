@@ -94,17 +94,17 @@ static void print_RpLidarRequestNoPayload(uint16_t indent, RpLidarRequestNoPaylo
     printf("%*scommand: 0x%02X\n", indent, "", rnp.command);
 }
 
-static void print_RpLidarRequestWithPayload(uint16_t indent, RpLidarRequestWithPayload rwp) {
-    printf("%*sstart_flag: 0x%02X\n", indent, "", rwp.start_flag);
-    printf("%*scommand: 0x%02X\n", indent, "", rwp.command);
-    printf("%*spayload_size: 0x%02X\n", indent, "", rwp.payload_size);
+static void print_RpLidarRequestWithPayload(uint16_t indent, RpLidarRequestWithPayload *rwp) {
+    printf("%*sstart_flag: 0x%02X\n", indent, "", rwp->start_flag);
+    printf("%*scommand: 0x%02X\n", indent, "", rwp->command);
+    printf("%*spayload_size: 0x%02X\n", indent, "", rwp->payload_size);
     printf("%*spayload:", indent, "");
-    uint8_t i = 0;
+    uint8_t i = 0, *payload = rwp->payload;
     do {
-        printf(" %02X", rwp.payload[i]);
-    } while (i < rwp.payload_size);
+        printf(" %02X", payload[i]);
+    } while (i < rwp->payload_size);
     printf("\n");
-    printf("%*spayload_size: 0x%02X\n", indent, "", rwp.checksum);
+    printf("%*spayload_size: 0x%02X\n", indent, "", rwp->checksum);
 }
 
 static void print_RpLidarResponseDescriptor(uint16_t indent, RpLidarResponseDescriptor rd) {
