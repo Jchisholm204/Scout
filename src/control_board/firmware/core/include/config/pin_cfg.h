@@ -17,7 +17,8 @@
 #define _PIN_CFG_H_
 
 // Define the board to use
-#define BOARD_NUCLEOZE
+// #define BOARD_NUCLEOZE
+#define BOARD_CAPSTONE_CB
 // #define BOARD_ARMV1
 
 #if defined(BOARD_MOCKECU)
@@ -26,6 +27,8 @@
     #include "config/boards/nucleoze.h"
 #elif defined(BOARD_ARMV1)
     #include "config/boards/armv1.h"
+#elif defined(BOARD_CAPSTONE_CB)
+    #include "config/boards/capstone_cb.h"
 #endif
 
 #ifndef _BOARD_CONFIG_
