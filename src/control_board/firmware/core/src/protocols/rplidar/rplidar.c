@@ -12,6 +12,7 @@
 #include "protocols/rplidar/rplidar.h"
 #include "os/systime.h"
 #include "string.h"
+#include "usb_packet.h"
 
 void vRpLidar_tsk(void* pvParams);
 
@@ -81,13 +82,13 @@ eRpLidarError rplidar_read(RpLidar_t* pHndl, RpLidarScanArray* const pScan) {
     return eRpLidarOK;
 }
 
+#if 0
 static void print_bytes(const void *data, size_t len) {
     const uint8_t *p = data;
-
-    for (size_t i = 0; i < len; i++) {
+    for (size_t i = 0; i < len; i++)
         printf("byte %u: %02X\n", i, p[i]);
-    }
 }
+#endif
 
 static void print_RpLidarRequestNoPayload(uint16_t indent, RpLidarRequestNoPayload rnp) {
     printf("%*sstart_flag: 0x%02X\n", indent, "", rnp.start_flag);
@@ -181,7 +182,7 @@ static void print_RpLidarScanDataResponse(const uint16_t indent, const RpLidarSc
     printf("%*sdistance_q2: %d\n", indent, "", scan.distance_q2);
 }
 
-static void print_RpLidarExpressScanDataResponseRaw(const uint16_t indent, const RpLidarExpressScanDataResponseRaw scan) {
+static void print_RpLidarExpressScanDataResponseRaw(const uint16_t indent, const RpLidarExpressScanDataResponse scan) {
     printf("%*schecksum1: %01X\n", indent, "", scan.checksum1);
     printf("%*ssync1: %01X\n", indent, "", scan.sync1);
     printf("%*schecksum2: %01X\n", indent, "", scan.checksum2);
@@ -777,10 +778,7 @@ void vRpLidar_tsk(void* pvParams){
     request_packet_with_payload.payload[3] = 0x00;
     request_packet_with_payload.payload[4] = 0x00;
     request_packet_with_payload.checksum = checksum_RpLidarRequestPacketWithPayload(&request_packet_with_payload);
-    memcpy(request, &request_packet_with_payload, offsetof(typeof(request_packet_with_payload), payload));
-    memcpy(request+offsetof(typeof(request_packet_with_payload), payload), request_packet_with_payload.payload, request_packet_with_payload.payload_size);
-    memcpy(request+offsetof(typeof(request_packet_with_payload), payload) + request_packet_with_payload.payload_size, &request_packet_with_payload.checksum, sizeof(request_packet_with_payload.checksum));
-    request_size = sizeof(request_packet_with_payload) - sizeof(request_packet_with_payload.payload) + request_packet_with_payload.payload_size;
+    request_size = memcpy_RpLidarRequestPacketWithPayload(request, &request_packet_with_payload);
     // print to make sure it's prepared correctly
     printf("%s: request packet: \n", request_name);
     print_RpLidarRequestWithPayload(4, &request_packet_with_payload);
@@ -802,22 +800,22 @@ void vRpLidar_tsk(void* pvParams){
     // printf("%s: received response descriptor\n", request_name);
     printf("%s: response descriptor:\n", request_name);
     print_RpLidarResponseDescriptor(4, response_descriptor);
-    if (response_descriptor.data_response_length != sizeof(RpLidarExpressScanDataResponseRaw))
+    if (response_descriptor.data_response_length != sizeof(RpLidarExpressScanDataResponse))
         printf("ERROR: %s: response_descriptor.data_response_length != expected_data_response_length\n", request_name);
     // wait for motor speed to pick up
     // vTaskDelayUntil(&last_wake_time, 2000);
     // receive data response packet, repeat as many times as you want.
     const uint32_t express_scans_to_poll = 2;
-    RpLidarExpressScanDataResponseRaw express_scan_data_response_raw;
-    // response_descriptor.data_response_length = sizeof(express_scan_data_response_raw);
+    RpLidarExpressScanDataResponse express_scan_data_response;
+    // response_descriptor.data_response_length = sizeof(express_scan_data_response);
     for (uint32_t i = 0; i < express_scans_to_poll; ++i) {
         // printf("%s(%lu): reading %u bytes from Serial3:\n", request_name, i, response_descriptor.data_response_length);
-        while (stream_read_exact(pHndl->rx_hndl, &express_scan_data_response_raw, response_descriptor.data_response_length, 100) != eRpLidarOK)
+        while (stream_read_exact(pHndl->rx_hndl, &express_scan_data_response, response_descriptor.data_response_length, 100) != eRpLidarOK)
             printf("ERROR: %s(%lu): cannot read data response from Serial3\n", request_name, i);
-        // print_bytes(&express_scan_data_response_raw, sizeof(express_scan_data_response_raw));
+        // print_bytes(&express_scan_data_response, sizeof(express_scan_data_response));
         // printf("%s(%lu): received data response\n", request_name, i);
         printf("%s(%lu): data response:\n", request_name, i);
-        print_RpLidarExpressScanDataResponseRaw(4, express_scan_data_response_raw);
+        print_RpLidarExpressScanDataResponseRaw(4, express_scan_data_response);
     }
     // send a STOP request to stop the scanning
     request_name = "STOP";
@@ -837,6 +835,82 @@ void vRpLidar_tsk(void* pvParams){
     while (xStreamBufferReceive(pHndl->rx_hndl, request, sizeof(request), 0) > 0);
 
 
+    // Now to do express scans, with sliding window, 
+    // convert them into `struct udev_pkt_lidar`
+    request_name = "EXPRESS_SCAN";
+    request_packet_with_payload.command = COMMAND_EXPRESS_SCAN;
+    request_packet_with_payload.payload_size = 0x05;
+    request_packet_with_payload.payload[0] = (uint8_t)typical_scan_mode;
+    request_packet_with_payload.payload[1] = 0x00;
+    request_packet_with_payload.payload[2] = 0x00;
+    request_packet_with_payload.payload[3] = 0x00;
+    request_packet_with_payload.payload[4] = 0x00;
+    request_packet_with_payload.checksum = checksum_RpLidarRequestPacketWithPayload(&request_packet_with_payload);
+    request_size = memcpy_RpLidarRequestPacketWithPayload(request, &request_packet_with_payload);
+    printf("%s: request packet: \n", request_name);
+    print_RpLidarRequestWithPayload(4, &request_packet_with_payload);
+    // send the request packet
+    while (serial_write(pHndl->pSerial, request, request_size, 10) != eSerialOK)
+        printf("ERROR: %s: cannot write request packet to Serial3\n", request_name);
+    // get response descriptor
+    while (stream_read_exact(pHndl->rx_hndl, &response_descriptor, sizeof(response_descriptor), 10) != eRpLidarOK)
+        printf("ERROR: %s: cannot read response descriptor\n", request_name);
+    printf("%s: response descriptor:\n", request_name);
+    print_RpLidarResponseDescriptor(4, response_descriptor);
+    // validate response descriptor
+    if (!(response_descriptor.start_flag1==START_FLAG1 && response_descriptor.start_flag2==START_FLAG2))
+        printf("ERROR: %s: invalid format on RPLidar response descriptor\n", request_name);
+    if (response_descriptor.data_response_length != sizeof(RpLidarExpressScanDataResponse))
+        printf("ERROR: %s: response_descriptor.data_response_length != expected_data_response_length\n", request_name);
+    // receive data responses then convert to usb packets
+    #define WINDOW_SIZE 2
+    #define max(a, b) ((a > b) ? (a) : (b))
+    #define min(a, b) ((a < b) ? (a) : (b))
+    RpLidarExpressScanDataResponse rplidar_buf[WINDOW_SIZE];
+    // bytes of express scan cabin already used for usb_pkt
+    uint8_t have[WINDOW_SIZE] = {0,0};
+    const uint8_t cabin_size = sizeof(rplidar_buf->cabin)/sizeof(rplidar_buf->cabin[0]);
+    struct udev_pkt_lidar usb_pkt = {0};
+    uint16_t start_angle_q6, end_angle_q6, next_angle_q6, angle_diff_q6;
+    float start_angle, end_angle, next_angle, angle_diff;
+    for (uint8_t i = 0, want, take[WINDOW_SIZE];; i = have[i]==0 ? 1-i : i) {
+        want = UDEV_LIDAR_POINTS;
+        // if empty, refill packet i
+        if (have[i] == 0) {
+            while (stream_read_exact(pHndl->rx_hndl, rplidar_buf+i, sizeof(rplidar_buf[i]), 100) != eRpLidarOK)
+                printf("ERROR: %s(%u): cannot read data response from Serial3\n", request_name, i);
+            have[i] = cabin_size;
+            start_angle_q6 = rplidar_buf[i].start_angle_q6;
+            start_angle = start_angle_q6/64.0;
+        }
+        // take what we can from packet i
+        take[i] = min(want, have[i]);
+        memcpy(usb_pkt.distances, rplidar_buf[i].cabin+cabin_size-have[i], take[i]*sizeof(*usb_pkt.distances));
+        want -= take[i];
+        have[i] -= take[i];
+        // if empty, refill packet 1-i
+        if (have[1-i] == 0) {
+            while (stream_read_exact(pHndl->rx_hndl, rplidar_buf+1-i, sizeof(rplidar_buf[1-i]), 100) != eRpLidarOK)
+                printf("ERROR: %s(%u): cannot read data response from Serial3\n", request_name, 1-i);
+            have[1-i] = cabin_size;
+            next_angle_q6 = rplidar_buf[1-i].start_angle_q6;
+            next_angle = next_angle_q6/64.0;
+        }
+        // update start_angle based on the amount that was taken
+        angle_diff_q6 = (start_angle_q6 > next_angle_q6)*360*64 + next_angle_q6 - start_angle_q6;
+        angle_diff = angle_diff_q6/64.0;
+        start_angle += angle_diff*take[i]/(float)cabin_size;
+        // take the rest from packet 1-i
+        take[1-i] = min(want, have[1-i]);
+        want -= take[1-i];
+        memcpy(usb_pkt.distances+take[i], rplidar_buf[1-i].cabin+cabin_size-have[1-i], take[1-i]*sizeof(*usb_pkt.distances));
+        have[1-i] -= take[1-i];
+        // calculate angles
+        // calculate sequence number from angles
+        // ...
+        // print usb packet
+    }
+    
 
     for (;;) {
         printf("vRpLidar_tsk\n");

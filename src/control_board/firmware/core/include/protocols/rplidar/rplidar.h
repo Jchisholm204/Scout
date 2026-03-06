@@ -149,7 +149,7 @@ typedef struct {
     uint16_t start_angle_q6 : 15;
     uint8_t start : 1;
     uint16_t cabin[40];
-} __attribute__((packed)) RpLidarExpressScanDataResponseRaw;
+} __attribute__((packed)) RpLidarExpressScanDataResponse;
 
 #define SYNC1 0xA
 #define SYNC2 0x5
