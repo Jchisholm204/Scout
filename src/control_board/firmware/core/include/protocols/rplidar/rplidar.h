@@ -46,21 +46,22 @@ typedef struct {
     uint8_t start_flag;
     uint8_t command;
     uint8_t payload_size;
-    uint8_t payload[256];
+    uint8_t payload[255];
     uint8_t checksum;
 } __attribute__((packed)) RpLidarRequestWithPayload;
 
 #define START_FLAG 0xA5
 
 typedef uint8_t eRpLidarCommand;
-#define COMMAND_STOP            0x25
-#define COMMAND_RESET           0x40
-#define COMMAND_SCAN            0x20
-#define COMMAND_EXPRESS_SCAN    0x82
-#define COMMAND_GET_INFO        0x50
-#define COMMAND_GET_HEALTH      0x52
-#define COMMAND_GET_SAMPLERATE  0x59
-#define COMMAND_GET_LIDAR_CONF  0x84
+#define COMMAND_STOP                0x25
+#define COMMAND_RESET               0x40
+#define COMMAND_SCAN                0x20
+#define COMMAND_EXPRESS_SCAN        0x82
+#define COMMAND_GET_INFO            0x50
+#define COMMAND_GET_HEALTH          0x52
+#define COMMAND_GET_SAMPLERATE      0x59
+#define COMMAND_GET_LIDAR_CONF      0x84
+#define COMMAND_MOTOR_SPEED_CTRL    0xA8
 
 
 typedef struct {
@@ -77,7 +78,7 @@ typedef uint8_t eRpLidarConfigEntryType;
 #define RPLIDAR_CONF_SCAN_MODE_COUNT            0x70
 #define RPLIDAR_CONF_SCAN_MODE_US_PER_SAMPLE    0x71
 #define RPLIDAR_CONF_SCAN_MODE_MAX_DISTANCE     0x74
-#define RPLIDAR_CONF_SCAN_MODE_ANS_TYPE         0x74
+#define RPLIDAR_CONF_SCAN_MODE_ANS_TYPE         0x75
 #define RPLIDAR_CONF_SCAN_MODE_TYPICAL          0x7C
 #define RPLIDAR_CONF_SCAN_MODE_NAME             0x7F
 
@@ -135,10 +136,23 @@ typedef struct {
     uint8_t start : 1; // Start flag bit of a new scan. When start is set to 1, the current and incoming packets belong to a new 360 degree scan.
     uint8_t n_start : 1; // Inversed start flag bit, always has n_start = !start. Can be used as a data check bit.
     uint8_t quality : 6;
-    uint16_t check : 1; // Check bit, constantly set to 1. Can be used as a data check bit.
+    uint8_t check : 1; // Check bit, constantly set to 1. Can be used as a data check bit.
     uint16_t angle_q6 : 15; // The measurement heading angle related to RPLIDAR’s heading. In degree unit, [0-360) Stored using fix point number. Actual angle = angle_q6/64.0 Degree
     uint16_t distance_q2 : 16; // Measured object distance related to RPLIDAR’s rotation center. In millimeter (mm) unit. Represents using fix point. Set to 0 when the measurement is invalid. Actual Distance = distance_q2/4.0 mm
-} __attribute__((packed)) RpLidarScan;
+} __attribute__((packed)) RpLidarScanDataResponse;
+
+typedef struct {
+    uint8_t checksum1 : 4;
+    uint8_t sync1 : 4;
+    uint8_t checksum2 : 4;
+    uint8_t sync2 : 4;
+    uint16_t start_angle_q6 : 15;
+    uint8_t start : 1;
+    uint16_t cabin[40];
+} __attribute__((packed)) RpLidarExpressScanDataResponseRaw;
+
+#define SYNC1 0xA
+#define SYNC2 0x5
 
 typedef struct {
     float angle;
