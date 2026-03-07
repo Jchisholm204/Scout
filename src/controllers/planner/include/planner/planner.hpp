@@ -19,7 +19,6 @@
 #include <sensor_msgs/msg/battery_state.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <slg_msgs/msg/segment_array.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float32.h>
 #include <std_msgs/msg/float32.hpp>
