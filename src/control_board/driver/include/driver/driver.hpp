@@ -35,7 +35,7 @@ class Driver : public rclcpp::Node {
     int _lusb_err;
     int _usb_send_ls(struct udev_pkt_lidar& pkt_ldr);
     int _usb_recv_ls(struct udev_pkt_lidar& pkt_ldr);
-    int _usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMode mode);
+    int _usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt);
     int _usb_recv_ctrl(struct udev_pkt_ctrl_rx& pkt);
     int _usb_connected(void);
     int _usb_reconnect(void);
@@ -65,10 +65,7 @@ class Driver : public rclcpp::Node {
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
     void _ctrl_callback(void);
 
-    // rclcpp::Subscription<std_msgs::msg::UInt8> _mode_sub;
-    void _mode_callback(std_msgs::msg::UInt8& new_mode);
-    enum eCBMode _new_mode;
-    // rclcpp::Subscription<geometry_msgs::msg::Quaternion> _vel_cmd_sub;
+    rclcpp::Subscription<geometry_msgs::msg::Quaternion>::SharedPtr _vel_cmd_sub;
     void _vel_callback(const geometry_msgs::msg::Quaternion& qt);
 };
 

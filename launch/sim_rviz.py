@@ -1,6 +1,7 @@
 from launch import LaunchDescription
+from launch.actions import TimerAction, ExecuteProcess
 from launch.actions import DeclareLaunchArgument
-from launch_ros.actions import Node
+from launch_ros.actions import Node, LifecycleNode
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -65,16 +66,41 @@ def generate_launch_description():
             package='simulation',
             executable='control',
             name='sim_ctrl',
-            ),
+        ),
         Node(
             package='simulation',
             executable='lidarstreams',
             name='sim_lidar',
-            ),
+        ),
+        Node(
+            package='simulation',
+            executable='telemetry',
+            name='sim_telemetry',
+            parameters=[
+                {"pub_rate": 50}
+            ]
+        ),
         # Launch the driver board interface
         Node(
             package='control_board',
             executable='driver',
             name='cb_interface',
-            ),
+        ),
+        # Launch the LiDAR Segmentation Node
+        # Node(
+        #     package='laser_segmentation',
+        #     executable='laser_segmentation',
+        #     name='lidar_segmentation',
+        #     parameters=[{
+        #         'target_frame': 'lidar_front_frame',
+        #         'segmentation_type': 'jump_distance_merge',  # Common algorithm
+        #         'min_points': 5,
+        #         'max_distance_jump': 0.1,
+        #     }],
+        #     remappings=[
+        #         # Map 'scan' to your specific lidar topic name if it's different
+        #         ('/scan', '/cb/ls_front'),
+        #     ],
+        #     output='screen'
+        # ),
     ])
