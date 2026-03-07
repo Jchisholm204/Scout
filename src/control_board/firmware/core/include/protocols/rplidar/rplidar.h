@@ -150,7 +150,9 @@ typedef struct {
     uint8_t start : 1;
 } __attribute__((packed)) RpLidarExpressScanDataResponseHeader;
 
-typedef uint16_t RpLidarExpressScanDataResponseDistances[40];
+#define RPLIDAR_EXPRESS_SCAN_CABIN_SIZE 40U
+
+typedef uint16_t RpLidarExpressScanDataResponseDistances[RPLIDAR_EXPRESS_SCAN_CABIN_SIZE];
 
 typedef struct {
     RpLidarExpressScanDataResponseHeader header;
