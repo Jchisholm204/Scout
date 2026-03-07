@@ -16,7 +16,10 @@
 #include "usb_cb_defs.h"
 #include "usb_packet.h"
 
+// #define ANGLE_PER_REVOLUTION (2.0f * 3.1415926535f)
+// ANGLE_PER_LIDAR_PACKET
 #define UDEV_LIDAR_SEQ_STEP ((float) ((2.0f * 3.1415926535f) / (int) UDEV_LIDAR_SEQ_MAX))
+// ANGLE_PER_LIDAR_POINT
 #define UDEV_LIDAR_ITER_STEP ((float) (UDEV_LIDAR_SEQ_STEP / (int) UDEV_LIDAR_POINTS))
 
 struct udev_lidar {

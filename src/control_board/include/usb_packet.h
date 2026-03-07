@@ -24,9 +24,13 @@
 #include <assert.h>
 #include <stdint.h>
 
+// LIDAR_POINTS_PER_REVOLUTION
 #define UDEV_LIDAR_RANGE 180
+// LIDAR_POINTS_PER_PACKET
 #define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 4) / 2)
+// LIDAR_PACKETS_PER_REVOLUTION
 #define UDEV_LIDAR_SEQ_MAX ((UDEV_LIDAR_RANGE - 1 + UDEV_LIDAR_POINTS) / UDEV_LIDAR_POINTS)
+// LIDAR_PACKETS_PER_REVOLUTION
 #define UDEV_SEQ_MAX UDEV_LIDAR_SEQ_MAX
 
 struct udev_pkt_ctrl_tx {
@@ -56,6 +60,7 @@ struct udev_pkt_lidar {
     struct {
         uint8_t id : 1;
         uint8_t sequence : 7;
+        // number of distances stored in the packet
         uint8_t len;
     } __attribute__((packed)) hdr;
     uint16_t distance_sum;
