@@ -25,11 +25,14 @@
 #include <stdint.h>
 
 // based on the C1M1-R2 RPLiDAR sensor datasheet https://www.slamtec.com/en/Support#rplidar-c1 https://download-en.slamtec.com/api/download/rplidar-c1-datasheet/1?lang=en
-#define LIDAR_POINTS_PER_SECOND 5000
+// #define LIDAR_POINTS_PER_SECOND 5000
 // obtained from testing the C1M1-R2 RPLiDAR sensor when performing EXPRESS_SCAN requests
-#define MILLISECONDS_PER_ROTATION 83
+// #define MILLISECONDS_PER_ROTATION 83
 // LIDAR_POINTS_PER_ROTATION
-#define UDEV_LIDAR_RANGE (((LIDAR_POINTS_PER_SECOND)*(MILLISECONDS_PER_ROTATION))/1000)
+// #define UDEV_LIDAR_RANGE (((LIDAR_POINTS_PER_SECOND)*(MILLISECONDS_PER_ROTATION))/1000)
+
+// LIDAR_POINTS_PER_ROTATION
+#define UDEV_LIDAR_RANGE 180
 // LIDAR_POINTS_PER_PACKET
 #define UDEV_LIDAR_POINTS ((LIDAR_DATA_SZ - 4) / 2)
 // LIDAR_PACKETS_PER_ROTATION
