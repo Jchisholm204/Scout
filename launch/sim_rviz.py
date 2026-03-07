@@ -14,65 +14,6 @@ def generate_launch_description():
     with open(urdf_path, 'r') as f:
         robot_desc = f.read()
 
-    # 1. Define the node
-    seg_node = LifecycleNode(
-        package='laser_segmentation',
-        executable='laser_segmentation',
-        name='lidar_segmentation',
-        namespace='',
-        output='screen',
-        # parameters=[{
-        #     'target_frame': 'lidar_front_frame',  # Or 'base_link'
-        #     'segmentation_type': 'jump_distance_merge',
-        #     'min_points_segment': 5,
-        #     'max_distance_jump': 0.1,
-        # }],
-        parameters=[{
-            'scan_topic': '/sim/ls_front',
-            'target_frame': 'base_link',
-            'segmentation_type': 'jump_distance_merge',
-
-            # AGGRESSIVE MERGING (The "Error" Tolerance)
-            'distance_threshold': 0.2,       # Large gap tolerance between points
-            'max_distance_jump': 0.25,        # Merge segments even if they are far apart
-
-            # GENERIC FILTERING
-            'min_points_segment': 3,         # Accept even very "sparse" walls
-            'max_points_segment': 500,       # Allow long continuous hallway walls
-            'min_segment_width': 0.05,        # Don't throw away small wall chunks
-            'max_segment_width': 15.0,       # Capture the whole side of a long hall
-
-            # RANGE (Generic Hallway)
-            'min_avg_distance_from_sensor': 0.1,
-            'max_avg_distance_from_sensor': 10.0,
-        }],
-        remappings=[('/scan', '/cb/ls_front')]
-    )
-
-    # 2. Simple Command Line "Activators"
-    # We wait 2 seconds after the node starts to trigger the states
-    configure_cmd = TimerAction(
-        period=2.0,
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'lifecycle', 'set',
-                     '/lidar_segmentation', 'configure'],
-                output='screen'
-            )
-        ]
-    )
-
-    activate_cmd = TimerAction(
-        period=4.0,  # Wait a bit longer to ensure configuration finished
-        actions=[
-            ExecuteProcess(
-                cmd=['ros2', 'lifecycle', 'set',
-                     '/lidar_segmentation', 'activate'],
-                output='screen'
-            )
-        ]
-    )
-
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='false'),
 
@@ -162,7 +103,4 @@ def generate_launch_description():
         #     ],
         #     output='screen'
         # ),
-        seg_node,
-        configure_cmd,
-        activate_cmd,
     ])
