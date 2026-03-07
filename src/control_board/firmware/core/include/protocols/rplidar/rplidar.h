@@ -148,11 +148,125 @@ typedef struct {
     uint8_t sync2 : 4;
     uint16_t start_angle_q6 : 15;
     uint8_t start : 1;
-    uint16_t cabin[40];
+} __attribute__((packed)) RpLidarExpressScanDataResponseHeader;
+
+typedef uint16_t RpLidarExpressScanDataResponseDistances[40];
+
+typedef struct {
+    RpLidarExpressScanDataResponseHeader header;
+    RpLidarExpressScanDataResponseDistances cabin;
 } __attribute__((packed)) RpLidarExpressScanDataResponse;
 
 #define SYNC1 0xA
 #define SYNC2 0x5
+
+static inline void print_RpLidarRequestNoPayload(uint16_t indent, RpLidarRequestNoPayload rnp) {
+    printf("%*sstart_flag: 0x%02X\n", indent, "", rnp.start_flag);
+    printf("%*scommand: 0x%02X\n", indent, "", rnp.command);
+}
+
+static inline void print_RpLidarRequestWithPayload(uint16_t indent, RpLidarRequestWithPayload *rwp) {
+    printf("%*sstart_flag: 0x%02X\n", indent, "", rwp->start_flag);
+    printf("%*scommand: 0x%02X\n", indent, "", rwp->command);
+    printf("%*spayload_size: 0x%02X\n", indent, "", rwp->payload_size);
+    printf("%*spayload:", indent, "");
+    uint8_t i = 0, *payload = rwp->payload;
+    do {
+        printf(" %02X", payload[i]);
+    } while (++i < rwp->payload_size);
+    printf("\n");
+    printf("%*schecksum: 0x%02X\n", indent, "", rwp->checksum);
+}
+
+static inline void print_RpLidarResponseDescriptor(uint16_t indent, RpLidarResponseDescriptor rd) {
+    printf("%*sstart_flag1: 0x%02X\n", indent, "", rd.start_flag1);
+    printf("%*sstart_flag2: 0x%02X\n", indent, "", rd.start_flag2);
+    printf("%*sdata_response_length: %u\n", indent, "", rd.data_response_length);
+    printf("%*ssend_mode: 0x%1X\n", indent, "", rd.send_mode); 
+    printf("%*sdata_type: 0x%02X\n", indent, "", rd.data_type);  
+}
+
+static inline void print_RpLidarDeviceInfo(uint16_t indent, RpLidarDeviceInfo device_info) {
+    printf("%*smajor_model: %X\n", indent, "", device_info.major_model);
+    printf("%*ssub_model: %X\n", indent, "", device_info.sub_model);
+    printf("%*sfirmware_minor: %X\n", indent, "", device_info.firmware_minor);
+    printf("%*sfirmware_major: %X\n", indent, "", device_info.firmware_major);
+    printf("%*shardware: %X\n", indent, "", device_info.hardware);
+    printf("%*sserialnumber: %X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X-%X\n", 
+         indent, "",
+         device_info.serialnumber[0], 
+         device_info.serialnumber[1], 
+         device_info.serialnumber[2],
+         device_info.serialnumber[3],
+         device_info.serialnumber[4],
+         device_info.serialnumber[5],
+         device_info.serialnumber[6],
+         device_info.serialnumber[7],
+         device_info.serialnumber[8],
+         device_info.serialnumber[9],
+         device_info.serialnumber[10],
+         device_info.serialnumber[11],
+         device_info.serialnumber[12],
+         device_info.serialnumber[13],
+         device_info.serialnumber[14],
+         device_info.serialnumber[15]
+        );
+}
+
+static inline void print_RpLidarDeviceHealth(uint16_t indent, RpLidarDeviceHealth device_health) {
+    printf("%*sstatus: %u\n", indent, "", device_health.status);
+    printf("%*serror_code: %u\n", indent, "", device_health.error_code);
+}
+
+static inline void print_RpLidarSampleRate(uint16_t indent, RpLidarSampleRate sample_rate) {
+    printf("%*sTstandard: %u\n", indent, "", sample_rate.Tstandard);
+    printf("%*sTexpress: %u\n", indent, "", sample_rate.Texpress);
+}
+
+static inline void print_RpLidarConfResponseDataWithU8Payload(const uint16_t indent, const RpLidarConfResponseDataWithU8Payload data, const char *const payload_name) {
+    printf("%*stype: 0x%02lX\n", indent, "", data.type);
+    printf("%*s%s: 0x%02X\n", indent, "", payload_name, data.payload);
+}
+
+static inline void print_RpLidarConfResponseDataWithU16Payload(const uint16_t indent, const RpLidarConfResponseDataWithU16Payload data, const char *const payload_name) {
+    printf("%*stype: 0x%02lX\n", indent, "", data.type);
+    printf("%*s%s: %u\n", indent, "", payload_name, data.payload);
+}
+
+static inline void print_RpLidarConfResponseDataWithU32Payload(const uint16_t indent, const RpLidarConfResponseDataWithU32Payload data, const char *const payload_name) {
+    printf("%*stype: 0x%02lX\n", indent, "", data.type);
+    printf("%*s%s: %lu\n", indent, "", payload_name, data.payload);
+}
+
+static inline void print_RpLidarConfResponseDataWithStringPayload(const uint16_t indent, const RpLidarConfResponseDataWithStringPayload data, const char *const payload_name) {
+    printf("%*stype: 0x%02lX\n", indent, "", data.type);
+    printf("%*s%s: %s\n", indent, "", payload_name, data.payload);
+}
+
+static inline void print_RpLidarScanDataResponse(const uint16_t indent, const RpLidarScanDataResponse scan) {
+    printf("%*sstart: %u\n", indent, "", scan.start);
+    printf("%*sn_start: %u\n", indent, "", scan.n_start);
+    printf("%*squality: %u\n", indent, "", scan.quality);
+    printf("%*scheck: %u\n", indent, "", scan.check);
+    printf("%*sangle_q6: %d\n", indent, "", scan.angle_q6);
+    printf("%*sdistance_q2: %d\n", indent, "", scan.distance_q2);
+}
+
+static inline void print_RpLidarExpressScanDataResponseHeader(uint16_t const indent, RpLidarExpressScanDataResponseHeader const*header) {
+    printf("%*schecksum1: %01X\n", indent, "", header->checksum1);
+    printf("%*ssync1: %01X\n", indent, "", header->sync1);
+    printf("%*schecksum2: %01X\n", indent, "", header->checksum2);
+    printf("%*ssync2: %01X\n", indent, "", header->sync2);
+    printf("%*sstart_angle_q6: %u\n", indent, "", header->start_angle_q6);
+    printf("%*sstart: %u\n", indent, "", header->start);
+}
+
+static inline void print_RpLidarExpressScanDataResponse(const uint16_t indent, const RpLidarExpressScanDataResponse *scan) {
+    print_RpLidarExpressScanDataResponseHeader(indent, &scan->header);
+    printf("%*scabin: %u\n", indent, "", scan->cabin[0]);
+    for (uint8_t i = 1; i < sizeof(scan->cabin); ++i)
+        printf("%*s       %u\n", indent, "", scan->cabin[i]);
+}
 
 typedef struct {
     float angle;
