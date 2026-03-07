@@ -50,6 +50,8 @@ void Init(void) {
     struct usbi *usbi = usbi_init();
 
     // Initialize UART
+    Serial_t *Serial1 =
+        serial_init(eSerial1, /*baud*/ CRSF_BAUD, PIN_USART1_RX, PIN_USART1_TX);
     Serial_t *Serial2 =
         serial_init(eSerial2, /*baud*/ 115200, PIN_USART2_RX, PIN_USART2_TX);
     Serial_t *Serial3 =
@@ -77,7 +79,7 @@ void Init(void) {
     CtrlQueueHndl_t slqh =
         sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(
-        &ctrl_tsk, Serial4, Serial6, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+        &ctrl_tsk, Serial4, Serial5, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
 
     return;
 }

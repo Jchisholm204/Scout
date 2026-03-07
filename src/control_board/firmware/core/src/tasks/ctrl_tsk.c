@@ -271,16 +271,17 @@ void vCtrlTsk(void *pvParams) {
             cv_final = ctrl_run_manual(pHndl);
             break;
         case eModeStalled:
-            cv_final =
-                ctrl_run_controllers(pHndl, (ctrl_vec_t) {0}, cs_collision);
+            cv_final = ctrl_run_controllers(pHndl,
+                                            (ctrl_vec_t) {0},
+                                            (ctrl_state_t) {0});
             break;
         case eModeRCAuto:
             cv_final = ctrl_run_controllers(pHndl,
                                             ctrl_run_manual(pHndl),
-                                            cs_collision);
+                                            (ctrl_state_t) {0});
             break;
         case eModeAuto:
-            cv_final = ctrl_run_controllers(pHndl, cv_usb, cs_collision);
+            cv_final = ctrl_run_controllers(pHndl, cv_usb, (ctrl_state_t) {0});
             break;
         case eModeDisabled:
         case eModeFault:

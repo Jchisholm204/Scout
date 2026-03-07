@@ -19,6 +19,9 @@
 #define PIN_LED2 PIN('B', 14)
 #define PIN_LED1 PIN('B', 15)
 
+#define PIN_USART1_RX PIN('B', 6)
+#define PIN_USART1_TX PIN('B', 7)
+
 #define PIN_USART2_RX PIN('A', 2)
 #define PIN_USART2_TX PIN('A', 3)
 
