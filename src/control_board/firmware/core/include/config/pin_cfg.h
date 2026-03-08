@@ -17,8 +17,8 @@
 #define _PIN_CFG_H_
 
 // Define the board to use
-#define BOARD_NUCLEOZE
-// #define BOARD_ARMV1
+// #define BOARD_NUCLEOZE
+#define BOARD_ARMV1
 
 #if defined(BOARD_MOCKECU)
     #include "config/boards/mockecu.h"

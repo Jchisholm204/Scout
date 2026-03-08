@@ -122,6 +122,6 @@ add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${EXECUTABLE}> firmware.bin
     COMMAND find ${CMAKE_BINARY_DIR}/CMakeFiles -name '*.su' -exec cat {} + > ${CMAKE_BINARY_DIR}/firmware.su
     COMMAND ${CMAKE_COMMAND} -E echo "Looking for dynamic stacks..."
-    COMMAND grep 'dynamic' ${CMAKE_BINARY_DIR}/firmware.su || echo 'No dynamic stacks found!!'
+    # COMMAND grep 'dynamic' ${CMAKE_BINARY_DIR}/firmware.su || echo 'No dynamic stacks found!!'
 )
 

@@ -1,43 +1,50 @@
 /**
- * @file gravity_planner_tsk.c
+ * @file sim_lidar_tsk.c
  * @author Jacob Chisholm (https://Jchisholm204.github.io)
  * @brief
- * @version 0.1
+ * @version 0.2
  * @date Created: 2025-10-17
- * @modified Last Modified: 2025-10-17
+ * @modified Last Modified: 2026-01-16
  *
  * @copyright Copyright (c) 2025
  */
 
-#include "tasks/gravity_planner_tsk.h"
+#include "tasks/lidar_tsk.h"
 
 #include "FreeRTOS.h"
+#include "pin_cfg.h"
+#include "usb/usb_interface.h"
 
 #include <math.h>
 
-void vGPlanTsk(void *pvParams);
+StaticQueue_t lidar_rx_sqh;
+struct udev_pkt_lidar lidar_rx_buf[USBI_LIDAR_BUF_SIZE] = {0};
 
-QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
-                             QueueHandle_t usb_rx,
-                             QueueHandle_t usb_tx) {
+void vLidarTsk(void *pvParams);
+
+CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *pHndl,
+                                   QueueHandle_t usb_tx) {
     if (!pHndl) {
         return NULL;
     }
     // Initialize the usb queues
-    pHndl->usb.rx = usb_rx;
+    // pHndl->usb.rx = usb_rx;
+    // TODO: is there a better way to do this?
+    pHndl->usb.rx = xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
+                                       sizeof(struct udev_pkt_lidar),
+                                       (uint8_t *) lidar_rx_buf,
+                                       &lidar_rx_sqh);
     pHndl->usb.tx = usb_tx;
 
     // Setup the Collision Vector Output Queue
-    xCtrlQueueCreateStatic(&pHndl->cv_tx);
-
-    if (!pHndl->cv_tx.hndl) {
+    if (!xCtrlQueueCreateStatic(&pHndl->cvtx)) {
         return NULL;
     }
 
     // Setup the Gravity Planner Task
-    pHndl->tsk.hndl = xTaskCreateStatic(vGPlanTsk,
+    pHndl->tsk.hndl = xTaskCreateStatic(vLidarTsk,
                                         "gplan",
-                                        GPLAN_TSK_STACK_SIZE,
+                                        LIDAR_TSK_STACK_SIZE,
                                         pHndl,
                                         configMAX_PRIORITIES - 4,
                                         pHndl->tsk.stack,
@@ -55,7 +62,15 @@ QueueHandle_t gplan_tsk_init(struct gplan_tsk *pHndl,
         }
     }
 
-    return pHndl->cv_tx.hndl;
+    // Setup the rplidar subtasks
+    Serial_t *Serial3 =
+        serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
+    // would need another Serial port for the second rplidar sensor
+
+    rplidar_init(&pHndl->rplidar[eLidarFront], eLidarFront, Serial3, pHndl->usb.rx);
+    // rplidar_init(&pHndl->rplidar[eLidarVertical], eLidarVertical, Serial3, pHndl->usb.rx);
+
+    return pHndl->cvtx.hndl;
 }
 
 static inline float arm_sqrtf(float val) {
@@ -64,17 +79,10 @@ static inline float arm_sqrtf(float val) {
     return res;
 }
 
-void vGPlanTsk(void *pvParams) {
-    struct gplan_tsk *pHndl = (struct gplan_tsk *) pvParams;
+void vLidarTsk(void *pvParams) {
+    struct lidar_tsk *pHndl = (struct lidar_tsk *) pvParams;
 
     printf("Gplan Online\n");
-
-    TickType_t last_wake_time = xTaskGetTickCount();
-
-    int count = 0;
-
-    float d_ground = 0;
-    float d_ceil = 0;
 
     for (;;) {
         // Attempt to pull the latest packet from the incoming process queue
@@ -93,6 +101,8 @@ void vGPlanTsk(void *pvParams) {
         // // Process the incoming data
         float sum_x = 0.0f;
         float sum_y = 0.0f;
+        float ground_sum = 0.0f;
+        float ceil_sum = 0.0f;
         int valid_points = 0;
         for (int i = 0; i < ldrpkt.hdr.len; i++) {
             float d = (float) ldrpkt.distances[i] / 4000.0f;
@@ -102,7 +112,13 @@ void vGPlanTsk(void *pvParams) {
             valid_points++;
             float angle = udev_lidar_angle(ldrpkt.hdr.sequence, i);
             float weight = 1.0f / d;
-            sum_x += weight * cosf(angle);
+            float cos = cosf(angle);
+            sum_x += weight * cos;
+            if (cos < 0) {
+                ground_sum += fabsf(d * cos);
+            } else {
+                ceil_sum += fabsf(d * cos);
+            }
             sum_y += weight * sinf(angle);
         }
 
@@ -111,33 +127,24 @@ void vGPlanTsk(void *pvParams) {
             continue;
         }
 
+        // ground_sum /= ((float) valid_points / 2.0f);
+        // ceil_sum /= ((float) valid_points / 2.0f);
+
         // Add the new resultant sum depending on lidar orientation
-        // if (ldrpkt.hdr.id == eLidarFront) {
-        //     pHndl->sums_front[ldrpkt.hdr.sequence].x = sum_x;
-        //     pHndl->sums_front[ldrpkt.hdr.sequence].y = sum_y;
-        //     pHndl->sums_front[ldrpkt.hdr.sequence].z = 0.0f;
-        //     pHndl->sums_front[ldrpkt.hdr.sequence].w = 0.0f;
-        // }
+        if (ldrpkt.hdr.id == eLidarFront) {
+            pHndl->sums_front[ldrpkt.hdr.sequence].x = sum_x;
+            pHndl->sums_front[ldrpkt.hdr.sequence].y = sum_y;
+            pHndl->sums_front[ldrpkt.hdr.sequence].z = 0.0f;
+            pHndl->sums_front[ldrpkt.hdr.sequence].w = 0.0f;
+        }
         if (ldrpkt.hdr.id == eLidarVertical) {
             pHndl->sums_vertical[ldrpkt.hdr.sequence].x = 0.0f;
             pHndl->sums_vertical[ldrpkt.hdr.sequence].y = sum_y;
             pHndl->sums_vertical[ldrpkt.hdr.sequence].z = sum_x;
             pHndl->sums_vertical[ldrpkt.hdr.sequence].w = 0.0f;
-        } else {
-            continue;
+            pHndl->ceil_sums[ldrpkt.hdr.sequence] = ceil_sum;
+            pHndl->ground_sums[ldrpkt.hdr.sequence] = ground_sum;
         }
-
-        // if (ldrpkt.hdr.id == eLidarVertical && ldrpkt.hdr.sequence == 3) {
-        //     d_ground = (float) ldrpkt.distances[0] / 4000.0f;
-        //     // printf("Ground Distance: %3.3f\n",
-        //     //        ((float) ldrpkt.distances[0] / 4000.0f));
-        // }
-        //
-        // if (ldrpkt.hdr.id == eLidarVertical && ldrpkt.hdr.sequence == 0) {
-        //     d_ceil = (float) ldrpkt.distances[0] / 4000.0f;
-        //     // printf("Ground Distance: %3.3f\n",
-        //     //        ((float) ldrpkt.distances[0] / 4000.0f));
-        // }
 
         // Calculate the collision vector
         ctrl_state_t cs;
@@ -145,48 +152,22 @@ void vGPlanTsk(void *pvParams) {
         cs.cv.y = 0;
         cs.cv.z = 0;
         cs.cv.w = 0;
+        cs.ground_distance = 0;
+        cs.ceil_distance = 0;
 
         for (int i = 0; i < UDEV_LIDAR_SEQ_MAX; i++) {
             for (int j = 0; j < 4; j++) {
                 cs.cv.data[j] += pHndl->sums_vertical[i].data[j];
-                // qv.data[j] += pHndl->sums_front[i].data[j];
+                cs.cv.data[j] += pHndl->sums_front[i].data[j];
             }
+            cs.ground_distance += pHndl->ground_sums[i];
+            cs.ceil_distance += pHndl->ceil_sums[i];
         }
 
-        // if (count >= 20) {
-        // if (ldrpkt.hdr.id == eLidarVertical) {
-        // count = 0;
-        // if (ldrpkt.hdr.sequence == 3)
-        // printf("S: %d X: %2.3f Y: %2.3f\n",
-        //        ldrpkt.hdr.sequence,
-        //        sum_x,
-        //        sum_y);
-        // printf("CV: ");
-        // for (int j = 0; j < 4; j++) {
-        //     printf("%2.4f ", qv.data[j]);
-        // }
-        // printf("\n");
-        // }
-        // count++;
         // Send CV to control task
-        xQueueOverwrite(pHndl->cv_tx.hndl, &cs);
-
-        // float sum_sqrt = 0;
-        // for (int j = 0; j < 4; j++) {
-        //     sum_sqrt += qv.data[j] * qv.data[j];
-        // }
-        // sum_sqrt = arm_sqrtf(sum_sqrt);
-        // for (int j = 0; j < 4; j++) {
-        //     qv.data[j] = qv.data[j] / sum_sqrt;
-        // }
+        xQueueOverwrite(pHndl->cvtx.hndl, &cs);
 
         // Send the newly processed packet over USB for ROS LaserScan
         (void) xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
-        // vTaskDelayUntil(&last_wake_time, 20);
-        // quat_t qt;
-        // qt.z = (d_ceil - d_ground) / ((d_ceil + d_ground));
-
-        // printf("D: %2.3f\n", qt.z);
-
     }
 }

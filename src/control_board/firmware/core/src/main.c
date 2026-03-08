@@ -29,25 +29,29 @@
 // USB Includes
 #include "usb/usb_interface.h"
 
+// Protocol Includes
+#include "protocols/rplidar/rplidar.h"
+
 // Task Includes
 #include "tasks/ctrl_tsk.h"
-#include "tasks/gravity_planner_tsk.h"
 #include "tasks/sim_lidar_tsk.h"
+#include "tasks/lidar_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
-struct gplan_tsk gplan_tsk;
-struct sim_lidar_tsk sim_lidar_tsk;
+// struct sim_lidar_tsk sim_lidar_tsk;
+struct lidar_tsk lidar_tsk;
 struct test_tsk test_tsk;
 
 // Initialize all system Interfaces
 void Init(void) {
     // Initialize System Clock
     hal_clock_init();
-
     // Init USB Interface
     struct usbi *usbi = usbi_init();
+
+#if defined(BOARD_NUCLEOZE)
 
     // Initialize UART
     Serial_t *Serial3 =
@@ -68,11 +72,29 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    // QueueHandle_t slqh =
-    //     gplan_tsk_init(&gplan_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    CtrlQueueHndl_t slqh =
+CtrlQueueHndl_t slqh =
         sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
-    ctrl_tsk_init(&ctrl_tsk, Serial2, Serial5, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+    ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+#elif defined(BOARD_ARMV1)
+    // Initialize UART
+    Serial_t *Serial5 =
+        serial_init(eSerial5, /*baud*/ 115200, PIN_UART5_RX, PIN_UART5_TX);
+
+    // Register Serial Port 5 as STDIO
+    // (Use this serial port for printf)
+    register_stdio(Serial5);
+
+    /**
+     * Initialize System Tasks...
+     * All tasks should be initialized as static
+     * Tasks can be initialized dynamically, but may crash the system if they
+     * overflow the system memory (128Kb for the STM32f446)
+     */
+    test_tsk_init(&test_tsk, 1000);
+    CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, usbi->lidar_tx);
+    // ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
+    
+#endif
 
     return;
 }
