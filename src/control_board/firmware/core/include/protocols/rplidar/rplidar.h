@@ -275,6 +275,7 @@ typedef QueueHandle_t RpLidarQueueHandle_t;
 typedef struct {
     // enum eCBLidar id; eCBLidarFront = 0U; eCBLidarVertical = 1U;
     uint8_t id : 1;
+    uint8_t verbose:7; // to determine whether printing is verbose
     Serial_t* pSerial;
 
     // Task information (Maybe not needed)
@@ -302,9 +303,10 @@ typedef struct {
  * @param tx output Queue
  * @return
  */
-extern eRpLidarError rplidar_init(RpLidar_t* pHndl,
-                                  uint8_t id,
-                                  Serial_t* pSerial,
-                                  QueueHandle_t tx
+extern eRpLidarError rplidar_init(RpLidar_t *const pHndl,
+                                  uint8_t const id,
+                                  uint8_t const verbose,
+                                  Serial_t *const pSerial,
+                                  QueueHandle_t const tx
                                   );
 #endif

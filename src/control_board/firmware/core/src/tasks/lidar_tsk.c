@@ -63,8 +63,8 @@ CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *const pHndl,
     }
 
     // Setup the rplidar subtasks
-    rplidar_init(&pHndl->rplidar[eLidarFront], eLidarFront, port_lidar_front, pHndl->lidar_rx);
-    rplidar_init(&pHndl->rplidar[eLidarVertical], eLidarVertical, port_lidar_vertical, pHndl->lidar_rx);
+    rplidar_init(&pHndl->rplidar[eLidarFront], eLidarFront, false, port_lidar_front, pHndl->lidar_rx);
+    rplidar_init(&pHndl->rplidar[eLidarVertical], eLidarVertical, false, port_lidar_vertical, pHndl->lidar_rx);
 
     return pHndl->cvtx.hndl;
 }

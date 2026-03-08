@@ -98,9 +98,9 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, Serial3, Serial2, usbi->lidar_tx);
-    // CtrlQueueHndl_t slq =
-    //     sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    // CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, Serial3, Serial2, usbi->lidar_tx);
+    CtrlQueueHndl_t slq =
+        sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(
         &ctrl_tsk, Serial2, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slq);
 
