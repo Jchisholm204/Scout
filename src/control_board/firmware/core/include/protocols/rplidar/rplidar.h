@@ -40,7 +40,7 @@ typedef enum {
 typedef struct {
     uint8_t start_flag;
     uint8_t command;
-} __attribute__((packed)) RpLidarRequestNoPayload;
+} __attribute__((packed)) RpLidarRequest;
 
 typedef struct {
     uint8_t start_flag;
@@ -162,7 +162,7 @@ typedef struct {
 #define SYNC1 0xA
 #define SYNC2 0x5
 
-static inline void print_RpLidarRequestNoPayload(uint16_t indent, RpLidarRequestNoPayload rnp) {
+static inline void print_RpLidarRequestNoPayload(uint16_t indent, RpLidarRequest rnp) {
     printf("%*sstart_flag: 0x%02X\n", indent, "", rnp.start_flag);
     printf("%*scommand: 0x%02X\n", indent, "", rnp.command);
 }
@@ -270,14 +270,11 @@ static inline void print_RpLidarExpressScanDataResponse(const uint16_t indent, c
         printf("%*s       %u\n", indent, "", scan->cabin[i]);
 }
 
-typedef struct {
-    float angle;
-    float distance;
-} RpLidarPoint_t;
-
-typedef RpLidarPoint_t RpLidarScanArray[RPLIDAR_N_POINTS];
+typedef QueueHandle_t RpLidarQueueHandle_t;
 
 typedef struct {
+    // enum eCBLidar id; eCBLidarFront = 0U; eCBLidarVertical = 1U;
+    uint8_t id;
     Serial_t* pSerial;
 
     // Task information (Maybe not needed)
@@ -290,8 +287,8 @@ typedef struct {
     StaticStreamBuffer_t rx_streamBuf;
     uint8_t rx_buf[RPLIDAR_BUF_LEN];
 
-    // Internal
-    RpLidarScanArray scan;
+    // Output Queue
+    QueueHandle_t tx;
 
     eRpLidarError state;
 } RpLidar_t;
@@ -300,33 +297,17 @@ typedef struct {
  * @brief Initalize an RPLiDAR device
  *
  * @param pHndl Device Handle
+ * @param id id number from enum CBLidar
  * @param pSerial Serial Connection the device is on
- * @param stx Serial TX pin
- * @param srx Serial RX pin
+ * @param tx output Queue
+//  * @param stx Serial TX pin
+//  * @param srx Serial RX pin
  * @return
  */
 extern eRpLidarError rplidar_init(RpLidar_t* pHndl,
+                                  uint8_t id,
                                   Serial_t* pSerial,
+                                  QueueHandle_t output/*,
                                   pin_t stx,
-                                  pin_t srx);
-
-/**
- * @brief Attach a notifier to the LiDAR device
- *
- * @param pHndl LiDAR device handle
- * @param pTask Task to notify
- * @return
- */
-extern eRpLidarError rplidar_notify(RpLidar_t* pHndl,
-                                    TaskHandle_t* const pNotify_tskhndl);
-
-/**
- * @brief Read the latest scan from the LiDAR
- *
- * @param pHndl Device handle to read from
- * @param pScan Address to place scan data in
- * @return
- */
-extern eRpLidarError rplidar_read(RpLidar_t* pHndl, RpLidarScanArray* pScan);
-
+                                  pin_t srx*/);
 #endif

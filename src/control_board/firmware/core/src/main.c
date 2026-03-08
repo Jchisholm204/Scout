@@ -31,26 +31,27 @@
 
 // Protocol Includes
 #include "protocols/rplidar/rplidar.h"
-RpLidar_t rplidar_tsk;
 
 // Task Includes
 #include "tasks/ctrl_tsk.h"
 #include "tasks/sim_lidar_tsk.h"
+#include "tasks/lidar_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
-struct sim_lidar_tsk sim_lidar_tsk;
+// struct sim_lidar_tsk sim_lidar_tsk;
+struct lidar_tsk lidar_tsk;
 struct test_tsk test_tsk;
 
 // Initialize all system Interfaces
 void Init(void) {
     // Initialize System Clock
     hal_clock_init();
-
-#if defined(BOARD_NUCLEOZE)
     // Init USB Interface
     struct usbi *usbi = usbi_init();
+
+#if defined(BOARD_NUCLEOZE)
 
     // Initialize UART
     Serial_t *Serial3 =
@@ -76,8 +77,6 @@ CtrlQueueHndl_t slqh =
     // Initialize UART
     Serial_t *Serial5 =
         serial_init(eSerial5, /*baud*/ 115200, PIN_UART5_RX, PIN_UART5_TX);
-    Serial_t *Serial3 =
-        serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
 
     // Register Serial Port 5 as STDIO
     // (Use this serial port for printf)
@@ -90,7 +89,8 @@ CtrlQueueHndl_t slqh =
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    rplidar_init(&rplidar_tsk, Serial3, PIN_UART5_TX, PIN_UART5_RX);
+    CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, usbi->lidar_tx);
+    // ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
     
 #endif
 

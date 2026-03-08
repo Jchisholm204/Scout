@@ -19,9 +19,11 @@
 void vRpLidar_tsk(void* pvParams);
 
 eRpLidarError rplidar_init(RpLidar_t* pHndl,
+                           uint8_t id,
                            Serial_t* pSerial,
+                           QueueHandle_t tx/*,
                            pin_t stx,
-                           pin_t srx) {
+                           pin_t srx*/) {
 
     // Perform initial checks
     if (!pHndl)
@@ -29,7 +31,9 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
     if (!pSerial)
         return eRpLidarNULL;
 
+    pHndl->id = id;
     pHndl->pSerial = pSerial;
+    pHndl->tx = tx;
 
     // designate memory for buffer
     pHndl->rx_hndl = xStreamBufferCreateStatic(RPLIDAR_BUF_LEN,
@@ -65,27 +69,8 @@ eRpLidarError rplidar_init(RpLidar_t* pHndl,
     return eRpLidarOK;
 }
 
-eRpLidarError rplidar_notify(RpLidar_t* pHndl, TaskHandle_t* const pNotify_tskHndl) {
-    if (!pHndl)
-        return eRpLidarNULL;
-    if (!pNotify_tskHndl)
-        return eRpLidarNULL;
-#warning "rplidar_notify not implimented"
-    return eRpLidarOK;
-}
-
-eRpLidarError rplidar_read(RpLidar_t* pHndl, RpLidarScanArray* const pScan) {
-    (void)pHndl;
-    (void)pScan;
-#warning "rplidar_read not implimented"
-    // 1. Aquire read lock
-    // 2. Memcpy to the dest
-    // 3. Release read lock
-    return eRpLidarOK;
-}
-
-#define max(a, b) ((a > b) ? (a) : (b))
-#define min(a, b) ((a < b) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#define min(a, b) (((a) < (b)) ? (a) : (b))
 
 #if 0
 static inline void print_bytes(const void *data, size_t len) {
@@ -222,14 +207,15 @@ void vRpLidar_tsk(void* pvParams){
     if (!pHndl) {
         vTaskSuspend(NULL);
     }
+    QueueHandle_t tx = pHndl->tx;
     TickType_t last_wake_time = xTaskGetTickCount();
     const char *request_name;
-    RpLidarRequestNoPayload request_packet_no_payload = {.start_flag=START_FLAG};
+    RpLidarRequest request_packet_no_payload = {.start_flag=START_FLAG};
     RpLidarRequestWithPayload request_packet_with_payload;
     RpLidarResponseDescriptor response_descriptor;
     char request[32];
     uint16_t request_size;
-    RpLidarExpressScanDataResponse express_scan_data_response;
+    // RpLidarExpressScanDataResponse express_scan_data_response;
 
     #define READ(dst, len) stream_read_exact(pHndl->rx_hndl, dst, len, 10)
     #define WRITE(buf, len) serial_write(pHndl->pSerial, (char *)buf, len, 10) 
@@ -261,7 +247,7 @@ void vRpLidar_tsk(void* pvParams){
         printf("ERROR: %s: response_descriptor.data_response_length != sizeof(RpLidarDeviceInfo)\n", request_name);
     // receive data response
     RpLidarDeviceInfo device_info;
-    printf("%s: reading %u bytes from Serial3:\n", request_name, sizeof(device_info));
+    // printf("%s: reading %u bytes from Serial3:\n", request_name, sizeof(device_info));
     if (READ(&device_info, response_descriptor.data_response_length) != eRpLidarOK)
         printf("ERROR: %s: cannot read data response\n", request_name);
     // print stuff to make sure we are parsing correctly
@@ -840,6 +826,14 @@ void vRpLidar_tsk(void* pvParams){
     // print_RpLidarExpressScanDataResponseHeader(0, headers+rotations-1);
 #endif
 
+#if 0
+    // struct udev_pkt_lidar sequence number angle ranges:
+    printf("struct udev_pkt_lidar sequence number angle ranges:\n");
+    for (int seq = 0; seq < UDEV_SEQ_MAX; ++seq) {
+        printf("    %d: [%f, %f)\n", seq, udev_lidar_angle(seq, 0), udev_lidar_angle(seq, UDEV_LIDAR_POINTS));
+    }
+#endif 
+
 // #if 0
     // Now to do express scans, with sliding window, 
     // convert them into `struct udev_pkt_lidar`
@@ -878,6 +872,9 @@ void vRpLidar_tsk(void* pvParams){
     uint8_t have[WINDOW_SIZE];
     // angles in radians, because udev_lidar_index takes angle in radians
     struct udev_pkt_lidar usb_pkt[WINDOW_SIZE];
+    // set usb_pkt ids now because they don't change.
+    usb_pkt[0].hdr.id = pHndl->id;
+    usb_pkt[1].hdr.id = pHndl->id;
     float angle_diff[WINDOW_SIZE], start_angle[WINDOW_SIZE], end_angle[WINDOW_SIZE];
     int seq, iter;
     // want[i] = points that the usb_pkt[i] wants to take to be full.
@@ -885,161 +882,176 @@ void vRpLidar_tsk(void* pvParams){
     // take[i][j] = number of distances usb_pkt[i] to take from express scan cabin with header[j].
     uint8_t take[WINDOW_SIZE][WINDOW_SIZE];
     
-    // H0
-    // read first header
-    while (stream_read_exact(pHndl->rx_hndl, header+0, sizeof(*header), 100) != eRpLidarOK)
+    // index for header
+    uint8_t h = 0;
+    // Hh
+    // read header h
+    while (stream_read_exact(pHndl->rx_hndl, header+h, sizeof(*header), 100) != eRpLidarOK)
         printf("ERROR: %s: cannot read header from Serial3\n", request_name);
-    have[0] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
-    printf("header[0]:\n");
-    print_RpLidarExpressScanDataResponseHeader(4, header+0);
-    // take first distances into usb_pkt[0]
-    want[0] = UDEV_LIDAR_POINTS;
-    take[0][0] = min(want[0], have[0]);
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[0].distances, take[0][0]*sizeof(*usb_pkt[0].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[0] -= take[0][0], have[0] -= take[0][0];
-    assert(want[0] == 0);
-    // can't send usb_pkt[0] yet because we don't yet know the sequence number -> read another packet to get the sequence number.
-    want[1] = UDEV_LIDAR_POINTS;
-    take[1][0] = min(want[1], have[0]);
-    // read remaining H0 distances into usb_pkt[1]
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances, take[1][0]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[1] -= take[1][0], have[0] -= take[1][0];
-    assert(have[0] == 0);
+    have[h] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
+    printf("header[%u]:\n", h);
+    print_RpLidarExpressScanDataResponseHeader(4, header+h);
+
+    // for (uint8_t i = 0; i < 2; ++i, h = 1 - h){
+    for (;; h = 1 - h){
+        // take Hh distances into usb_pkt[0]
+        want[0] = UDEV_LIDAR_POINTS;
+        take[0][h] = 0, take[0][1-h] = 0;
+        take[0][h] = min(want[0], have[h]);
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[0].distances + take[0][1-h], take[0][h]*sizeof(*usb_pkt[0].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[0] -= take[0][h], have[h] -= take[0][h];
+        assert(want[0] == 0);
+        // can't send usb_pkt[0] yet because we don't yet know the sequence number -> read another packet to get the sequence number.
+        want[1] = UDEV_LIDAR_POINTS;
+        take[1][h] = 0, take[1][1-h] = 0;
+        take[1][h] = min(want[1], have[h]);
+        // read remaining Hh distances into usb_pkt[1]
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances + take[1][1-h], take[1][h]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[1] -= take[1][h], have[h] -= take[1][h];
+        assert(have[h] == 0);
     
-    // H1
-    // read next header to get the next start angle
-    while (stream_read_exact(pHndl->rx_hndl, header+1, sizeof(*header), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read header from Serial3\n", request_name);
-    have[1] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
-    printf("header[1]:\n");
-    print_RpLidarExpressScanDataResponseHeader(4, header+1);
-    // calculate start_angle and end_angle for usb_pkt[0], from header[0]->header[1].
-    angle_diff_q6[0] = (header[1].start_angle_q6 < header[0].start_angle_q6)*(360U*64U) + header[1].start_angle_q6 - header[0].start_angle_q6;
-    angle_diff[0] = angle_diff_q6[0]/64.0f*PI/180.0f;
-    start_angle[0] = header[0].start_angle_q6/64.0f*PI/180.0f + angle_diff[0]/40.0f;
-    end_angle[0] = header[0].start_angle_q6/64.0f*PI/180.0f + angle_diff[0]*take[0][0]/40.0f;
-    // calculate start_angle for usb_pkt[1]. can't do the end_angle yet because we don't have the next header
-    start_angle[1] = end_angle[0] + angle_diff[0]/40.0f;
-    // calculate sequence usb_pkt[0].hdr.sequence
-    udev_lidar_index(start_angle[0], &seq, &iter);
-    printf("start_angle[0]=%f sequence=%d\n", start_angle[0], seq);
-    udev_lidar_index(end_angle[0], &seq, &iter);
-    printf("end_angle[0]=%f sequence=%d\n", end_angle[0], seq);
-    usb_pkt[0].hdr.sequence = seq;
-    // set usb_pkt[0].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[0] and end_angle[0] fit inside the same sequence number.
-    usb_pkt[0].hdr.len = UDEV_LIDAR_POINTS;
-    // don't know what this is supposed to be, TODO: find out.
-    usb_pkt[0].distance_sum = 0;
-    // output usb_pkt[0]. done with usb_pkt[0], it can now be overwritten.
-    printf("usb_pkt[0]:\n");
-    print_udev_pkt_lidar(4, usb_pkt+0);
-    // fill up the rest of usb_pkt[1] with distances from H1
-    take[1][1] = min(want[1], have[1]);
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances, take[1][1]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[1] -= take[1][1], have[1] -= take[1][1];
-    assert(want[1] == 0);
-    // can't send usb_pkt[1] yet because we don't yet know the sequence number -> read another header to get the sequence number.
-    // read remaining H1 distances into usb_pkt[0]
-    want[0] = UDEV_LIDAR_POINTS;
-    take[0][1] = min(want[0], have[1]);
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[0].distances, take[0][1]*sizeof(*usb_pkt[0].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[0] -= take[0][1], have[1] -= take[0][1];
-    assert(have[1] == 0);
+        // H1-h
+        // read next header to get the next start angle
+        while (stream_read_exact(pHndl->rx_hndl, header+1-h, sizeof(*header), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read header from Serial3\n", request_name);
+        have[1-h] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
+        // printf("header[%u]:\n", 1-h);
+        // print_RpLidarExpressScanDataResponseHeader(4, header+1-h);
+        // calculate start_angle and end_angle for usb_pkt[0], from header[h]->header[1-h].
+        angle_diff_q6[h] = (header[1-h].start_angle_q6 < header[h].start_angle_q6)*(360U*64U) + header[1-h].start_angle_q6 - header[h].start_angle_q6;
+        angle_diff[h] = angle_diff_q6[h]/64.0f*PI/180.0f;
+        start_angle[0] = header[h].start_angle_q6/64.0f*PI/180.0f + angle_diff[h]/40.0f;
+        end_angle[0] = header[h].start_angle_q6/64.0f*PI/180.0f + angle_diff[h]*take[0][h]/40.0f;
+        start_angle[0] -= (start_angle[0] >= 2*PI)*2*PI;
+        end_angle[0] -= (end_angle[0] >= 2*PI)*2*PI;
+        // calculate start_angle for usb_pkt[1]. can't do the end_angle yet because we don't have the next header
+        start_angle[1] = end_angle[0] + angle_diff[h]/40.0f;
+        start_angle[1] -= (start_angle[1] >= 2*PI)*2*PI;
+        // calculate sequence usb_pkt[0].hdr.sequence
+        udev_lidar_index(start_angle[0], &seq, &iter);
+        usb_pkt[0].hdr.sequence = seq;
+        // printf("start_angle[0]=%f sequence=%d\n", start_angle[0], seq);
+        // udev_lidar_index(end_angle[0], &seq, &iter);
+        // printf("end_angle[0]=%f sequence=%d\n", end_angle[0], seq);
+        // set usb_pkt[0].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[0] and end_angle[0] fit inside the same sequence number.
+        usb_pkt[0].hdr.len = UDEV_LIDAR_POINTS;
+        // don't know what this is supposed to be, TODO: find out.
+        usb_pkt[0].distance_sum = 0;
+        // output usb_pkt[0]. done with usb_pkt[0], it can now be overwritten.
+        printf("usb_pkt[0]\n");
+        while (xQueueSendToBack(tx, usb_pkt+0, 100) != pdTRUE);
+        // print_udev_pkt_lidar(4, usb_pkt+0);
+        // fill up the rest of usb_pkt[1] with distances from H1
+        take[1][1-h] = min(want[1], have[1-h]);
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances + take[1][h], take[1][1-h]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[1] -= take[1][1-h], have[1-h] -= take[1][1-h];
+        assert(want[1] == 0);
+        // can't send usb_pkt[1] yet because we don't yet know the sequence number -> read another header to get the sequence number.
+        // read remaining H1-h distances into usb_pkt[0]
+        want[0] = UDEV_LIDAR_POINTS;
+        take[0][h] = 0, take[0][1-h] = 0;
+        take[0][1-h] = min(want[0], have[1-h]);
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[0].distances + take[0][h], take[0][1-h]*sizeof(*usb_pkt[0].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[0] -= take[0][1-h], have[1-h] -= take[0][1-h];
+        assert(have[1-h] == 0);
     
-    // H0
-    // read next header to get the start_angle
-    while (stream_read_exact(pHndl->rx_hndl, header+0, sizeof(*header), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read header from Serial3\n", request_name);
-    have[0] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
-    printf("header[0]:\n");
-    print_RpLidarExpressScanDataResponseHeader(4, header+0);
-    // calculate end_angle for usb_pkt[1]
-    angle_diff_q6[1] = (header[0].start_angle_q6 < header[1].start_angle_q6)*(360U*64U) + header[0].start_angle_q6 - header[1].start_angle_q6;
-    angle_diff[1] = angle_diff_q6[1]/64.0f*PI/180.0f;
-    end_angle[1] = header[1].start_angle_q6/64.0f*PI/180.0f + angle_diff[1]*take[1][1]/40.0f;
-    // calculate start_angle for usb_pkt[0]. can't do the end_angle yet because we dont know the next header
-    start_angle[0] = end_angle[1] + angle_diff[1]/40.0f;
-    // calculate sequence usb_pkt[1].hdr.sequence
-    udev_lidar_index(start_angle[1], &seq, &iter);
-    printf("start_angle[1]=%f sequence=%d\n", start_angle[1], seq);
-    udev_lidar_index(end_angle[1], &seq, &iter);
-    printf("end_angle[1]=%f sequence=%d\n", end_angle[1], seq);
-    usb_pkt[1].hdr.sequence = seq;
-    // set usb_pkt[1].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[1] and end_angle[1] fit inside the same sequence number.
-    usb_pkt[1].hdr.len = UDEV_LIDAR_POINTS;
-    // don't know what this is supposed to be, TODO: figure it out later.
-    usb_pkt[1].distance_sum = 0;
-    // output usb_pkt[1]. done with usb_pkt[1], it can now be overwritten.
-    printf("usb_pkt[1]:\n");
-    print_udev_pkt_lidar(4, usb_pkt+1);
-    // fill up the rest of usb_pkt[0] with H0 distances
-    take[0][0] = min(want[0], have[0]);
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances, take[0][0]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[0] -= take[0][0], have[0] -= take[0][0];
-    assert(want[0] == 0);
-    // can't send usb_pkt[0] yet because we don't yet know the sequence number -> read another header to get the sequence number.
-    // read remaining H0 distances into usb_pkt[1]
-    want[1] = UDEV_LIDAR_POINTS;
-    take[1][0] = min(want[1], have[0]);
-    while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances, take[1][0]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
-    want[1] -= take[1][0], have[0] -= take[1][0];
-    assert(want[0] == 0);
-    assert(have[0] == 0);
+        // Hh
+        // read next header to get the start_angle
+        while (stream_read_exact(pHndl->rx_hndl, header+h, sizeof(*header), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read header from Serial3\n", request_name);
+        have[h] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
+        // printf("header[%u]:\n", h);
+        // print_RpLidarExpressScanDataResponseHeader(4, header+h);
+        // calculate end_angle for usb_pkt[1], from header[1-h]->header[h]
+        angle_diff_q6[1-h] = (header[h].start_angle_q6 < header[1-h].start_angle_q6)*(360U*64U) + header[h].start_angle_q6 - header[1-h].start_angle_q6;
+        angle_diff[1-h] = angle_diff_q6[1-h]/64.0f*PI/180.0f;
+        end_angle[1] = header[1-h].start_angle_q6/64.0f*PI/180.0f + angle_diff[1-h]*take[1][1-h]/40.0f;
+        end_angle[1] -= (end_angle[1] >= 2*PI)*2*PI;
+        // calculate start_angle for usb_pkt[0]. can't do the end_angle yet because we dont know the next header
+        start_angle[0] = end_angle[1] + angle_diff[1-h]/40.0f;
+        start_angle[1] -= (start_angle[1] >= 2*PI)*2*PI;
+        // calculate sequence usb_pkt[1].hdr.sequence
+        udev_lidar_index(start_angle[1], &seq, &iter);
+        usb_pkt[1].hdr.sequence = seq;
+        // printf("start_angle[1]=%f sequence=%d\n", start_angle[1], seq);
+        // udev_lidar_index(end_angle[1], &seq, &iter);
+        // printf("end_angle[1]=%f sequence=%d\n", end_angle[1], seq);
+        // set usb_pkt[1].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[1] and end_angle[1] fit inside the same sequence number.
+        usb_pkt[1].hdr.len = UDEV_LIDAR_POINTS;
+        // don't know what this is supposed to be, TODO: figure it out later.
+        usb_pkt[1].distance_sum = 0;
+        // output usb_pkt[1]. done with usb_pkt[1], it can now be overwritten.
+        printf("usb_pkt[1]\n");
+        while (xQueueSendToBack(tx, usb_pkt+1, 100) != pdTRUE);
+        // print_udev_pkt_lidar(4, usb_pkt+1);
+        // fill up the rest of usb_pkt[0] with Hh distances
+        take[0][h] = min(want[0], have[h]);
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances + take[1][1-h], take[0][h]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[0] -= take[0][h], have[h] -= take[0][h];
+        assert(want[0] == 0);
+        // can't send usb_pkt[0] yet because we don't yet know the sequence number -> read another header to get the sequence number.
+        // read remaining Hh distances into usb_pkt[1]
+        want[1] = UDEV_LIDAR_POINTS;
+        take[1][h] = 0, take[1][1-h] = 0;
+        take[1][h] = min(want[1], have[h]);
+        while (stream_read_exact(pHndl->rx_hndl, usb_pkt[1].distances + take[1][1-h], take[1][h]*sizeof(*usb_pkt[1].distances), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read cabin from Serial3\n", request_name);
+        want[1] -= take[1][h], have[h] -= take[1][h];
+        assert(want[0] == 0);
+        assert(have[h] == 0);
 
-    // H1
-    // read next header to get the next start angle
-    while (stream_read_exact(pHndl->rx_hndl, header+1, sizeof(*header), 100) != eRpLidarOK)
-        printf("ERROR: %s: cannot read header from Serial3\n", request_name);
-    have[1] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
-    printf("header[1]:\n");
-    print_RpLidarExpressScanDataResponseHeader(4, header+1);
-    // calculate end_angle for usb_pkt[0]
-    angle_diff_q6[0] = (header[1].start_angle_q6 < header[0].start_angle_q6)*(360U*64U) + header[1].start_angle_q6 - header[0].start_angle_q6;
-    angle_diff[0] = angle_diff_q6[0]/64.0f*PI/180.0f;
-    end_angle[0] = header[0].start_angle_q6/64.0f*PI/180.0f + angle_diff[0]*take[0][0]/40.0f;
-    // calculate start_angle for usb_pkt[1]
-    start_angle[1] = end_angle[0] + angle_diff[0]/40.0f;
-    // calculate sequence usb_pkt[0].hdr.sequence
-    udev_lidar_index(start_angle[0], &seq, &iter);
-    printf("start_angle[0]=%f sequence=%d\n", start_angle[0], seq);
-    udev_lidar_index(end_angle[0], &seq, &iter);
-    printf("end_angle[0]=%f sequence=%d\n", end_angle[0], seq);
-    usb_pkt[0].hdr.sequence = seq;
-    // set usb_pkt[0].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[0] and end_angle[0] fit inside the same sequence number.
-    usb_pkt[0].hdr.len = UDEV_LIDAR_POINTS;
-    // don't know what this is supposed to be, TODO: find out.
-    usb_pkt[0].distance_sum = 0;
-    // output usb_pkt[0]. done with usb_pkt[0], it can now be overwritten.
-    printf("usb_pkt[0]:\n");
-    print_udev_pkt_lidar(4, usb_pkt+0);
-    // we can also calculate the end_angle for usb_pkt[1] since we have its next header
-    end_angle[1] = header[1].start_angle_q6/64.0f*PI/180.0f;
-    // calculate sequence usb_pkt[1].hdr.sequence
-    udev_lidar_index(start_angle[1], &seq, &iter);
-    printf("start_angle[1]=%f sequence=%d\n", start_angle[1], seq);
-    udev_lidar_index(end_angle[1], &seq, &iter);
-    printf("end_angle[1]=%f sequence=%d\n", end_angle[1], seq);
-    usb_pkt[1].hdr.sequence = seq;
-    // set usb_pkt[1].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[1] and end_angle[1] fit inside the same sequence number.
-    usb_pkt[1].hdr.len = UDEV_LIDAR_POINTS;
-    // don't know what this is supposed to be, TODO: figure it out later.
-    usb_pkt[1].distance_sum = 0;
-    // output usb_pkt[1]. done with usb_pkt[1], it can now be overwritten.
-    printf("usb_pkt[1]:\n");
-    print_udev_pkt_lidar(4, usb_pkt+1);
-
-
-    
-
-
-
-
+        // H1-h
+        // read next header to get the next start angle
+        while (stream_read_exact(pHndl->rx_hndl, header+1-h, sizeof(*header), 100) != eRpLidarOK)
+            printf("ERROR: %s: cannot read header from Serial3\n", request_name);
+        have[1-h] = RPLIDAR_EXPRESS_SCAN_CABIN_SIZE;
+        // printf("header[%u]:\n", 1-h);
+        // print_RpLidarExpressScanDataResponseHeader(4, header+1-h);
+        // calculate end_angle for usb_pkt[0], from header[h] -> header[1-h]
+        angle_diff_q6[h] = (header[1-h].start_angle_q6 < header[h].start_angle_q6)*(360U*64U) + header[1-h].start_angle_q6 - header[h].start_angle_q6;
+        angle_diff[h] = angle_diff_q6[h]/64.0f*PI/180.0f;
+        end_angle[0] = header[h].start_angle_q6/64.0f*PI/180.0f + angle_diff[0]*take[0][h]/40.0f;
+        end_angle[0] -= (end_angle[0] >= 2*PI)*2*PI;
+        // calculate start_angle for usb_pkt[1]
+        start_angle[1] = end_angle[0] + angle_diff[h]/40.0f;
+        start_angle[1] -= (start_angle[1] >= 2*PI)*2*PI;
+        // calculate sequence usb_pkt[0].hdr.sequence
+        udev_lidar_index(start_angle[0], &seq, &iter);
+        usb_pkt[0].hdr.sequence = seq;
+        // printf("start_angle[0]=%f sequence=%d\n", start_angle[0], seq);
+        // udev_lidar_index(end_angle[0], &seq, &iter);
+        // printf("end_angle[0]=%f sequence=%d\n", end_angle[0], seq);
+        // set usb_pkt[0].hdr.len to be full because we are filling it up. However, maybe we would want to cut the length short to make the start_angle[0] and end_angle[0] fit inside the same sequence number.
+        usb_pkt[0].hdr.len = UDEV_LIDAR_POINTS;
+        // don't know what this is supposed to be, TODO: find out.
+        usb_pkt[0].distance_sum = 0;
+        // output usb_pkt[0]. done with usb_pkt[0], it can now be overwritten.
+        printf("usb_pkt[0]\n");
+        while (xQueueSendToBack(tx, usb_pkt+0, 100) != pdTRUE);
+        // print_udev_pkt_lidar(4, usb_pkt+0);
+        // we can also calculate the end_angle for usb_pkt[1] since we have its next header
+        end_angle[1] = header[1-h].start_angle_q6/64.0f*PI/180.0f;
+        end_angle[1] -= (end_angle[1] >= 2*PI)*2*PI;
+        // calculate sequence usb_pkt[1].hdr.sequence
+        udev_lidar_index(start_angle[1], &seq, &iter);
+        usb_pkt[1].hdr.sequence = seq;
+        // printf("start_angle[1]=%f sequence=%d\n", start_angle[1], seq);
+        // udev_lidar_index(end_angle[1], &seq, &iter);
+        // printf("end_angle[1]=%f sequence=%d\n", end_angle[1], seq);
+        // set usb_pkt[1].hdr.len to be full because we are filling it up. However, ideally we would want to cut the length short to make the start_angle[1] and end_angle[1] fit inside the same sequence number.
+        usb_pkt[1].hdr.len = UDEV_LIDAR_POINTS;
+        // don't know what this is supposed to be, TODO: figure it out later.
+        usb_pkt[1].distance_sum = 0;
+        // output usb_pkt[1]. done with usb_pkt[1], it can now be overwritten.
+        printf("usb_pkt[1]\n");
+        while (xQueueSendToBack(tx, usb_pkt+1, 100) != pdTRUE);
+        // print_udev_pkt_lidar(4, usb_pkt+1);
+    }
 
     // send a STOP request to stop the scanning
     request_name = "STOP";
