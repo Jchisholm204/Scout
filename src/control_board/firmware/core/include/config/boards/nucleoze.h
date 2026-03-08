@@ -24,11 +24,15 @@
 #define PIN_USART3_RX PIN('D', 9)
 #define PIN_USART3_TX PIN('D', 8)
 
-#define PIN_USART6_RX PIN('G', 9)
-#define PIN_USART6_TX PIN('G', 14)
+#define PIN_UART4_RX PIN('C', 11)
+#define PIN_UART4_TX PIN('C', 10)
 
 #define PIN_UART5_RX PIN('D', 2)
 #define PIN_UART5_TX PIN('C', 12)
+
+#define PIN_USART6_RX PIN('G', 9)
+#define PIN_USART6_TX PIN('G', 14)
+
 
 // #define PIN_CAN1_RX PIN('A', 0)
 // #define PIN_CAN1_TX PIN('A', 0)
