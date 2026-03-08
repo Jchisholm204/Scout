@@ -300,14 +300,11 @@ typedef struct {
  * @param id id number from enum CBLidar
  * @param pSerial Serial Connection the device is on
  * @param tx output Queue
-//  * @param stx Serial TX pin
-//  * @param srx Serial RX pin
  * @return
  */
 extern eRpLidarError rplidar_init(RpLidar_t* pHndl,
                                   uint8_t id,
                                   Serial_t* pSerial,
-                                  QueueHandle_t output/*,
-                                  pin_t stx,
-                                  pin_t srx*/);
+                                  QueueHandle_t tx
+                                  );
 #endif

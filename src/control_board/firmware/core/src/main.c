@@ -79,6 +79,12 @@ void Init(void) {
     // Initialize UART
     Serial_t *Serial5 =
         serial_init(eSerial5, /*baud*/ 115200, PIN_UART5_RX, PIN_UART5_TX);
+    // for port_lidar_front
+    Serial_t *Serial3 =
+        serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
+    // for port_lidar_vertical
+    // Serial_t *Serial3 =
+    //     serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
 
     Serial_t *Serial2 =
         serial_init(eSerial2, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_RX);

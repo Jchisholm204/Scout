@@ -22,19 +22,19 @@ struct udev_pkt_lidar lidar_rx_buf[USBI_LIDAR_BUF_SIZE] = {0};
 
 void vLidarTsk(void *pvParams);
 
-CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *pHndl,
-                                   QueueHandle_t usb_tx) {
+CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *const pHndl,
+                                    Serial_t *const port_lidar_front,
+                                    Serial_t *const port_lidar_vertical,
+                                   QueueHandle_t const usb_tx) {
     if (!pHndl) {
         return NULL;
     }
-    // Initialize the usb queues
-    // pHndl->usb.rx = usb_rx;
-    // TODO: is there a better way to do this?
-    pHndl->usb.rx = xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
+    // Initialize the input and output queues
+    pHndl->lidar_rx = xQueueCreateStatic(USBI_LIDAR_BUF_SIZE,
                                        sizeof(struct udev_pkt_lidar),
                                        (uint8_t *) lidar_rx_buf,
                                        &lidar_rx_sqh);
-    pHndl->usb.tx = usb_tx;
+    pHndl->usb_tx = usb_tx;
 
     // Setup the Collision Vector Output Queue
     if (!xCtrlQueueCreateStatic(&pHndl->cvtx)) {
@@ -63,12 +63,8 @@ CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *pHndl,
     }
 
     // Setup the rplidar subtasks
-    Serial_t *Serial3 =
-        serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
-    // would need another Serial port for the second rplidar sensor
-
-    rplidar_init(&pHndl->rplidar[eLidarFront], eLidarFront, Serial3, pHndl->usb.rx);
-    // rplidar_init(&pHndl->rplidar[eLidarVertical], eLidarVertical, Serial3, pHndl->usb.rx);
+    rplidar_init(&pHndl->rplidar[eLidarFront], eLidarFront, port_lidar_front, pHndl->lidar_rx);
+    // rplidar_init(&pHndl->rplidar[eLidarVertical], eLidarVertical, port_lidar_vertical, pHndl->lidar_rx);
 
     return pHndl->cvtx.hndl;
 }
@@ -87,7 +83,7 @@ void vLidarTsk(void *pvParams) {
     for (;;) {
         // Attempt to pull the latest packet from the incoming process queue
         static struct udev_pkt_lidar ldrpkt = {0};
-        if (xQueueReceive(pHndl->usb.rx, &ldrpkt, 100) != pdTRUE) {
+        if (xQueueReceive(pHndl->lidar_rx, &ldrpkt, 100) != pdTRUE) {
             // Input Queue Empty
             printf("Lidar Input Queue Empty\n");
             continue;
@@ -106,6 +102,8 @@ void vLidarTsk(void *pvParams) {
         int valid_points = 0;
         for (int i = 0; i < ldrpkt.hdr.len; i++) {
             float d = (float) ldrpkt.distances[i] / 4000.0f;
+            // TODO: might have to change the max distance check to since the rplidar datasheet says accuracy outside the range [0.05, 12.0] cannot be guaranteed.
+            // if (d > 12.0f || d < 0.05f) {
             if (d > 45.0f || d < 0.1f) {
                 continue;
             }
@@ -168,6 +166,6 @@ void vLidarTsk(void *pvParams) {
         xQueueOverwrite(pHndl->cvtx.hndl, &cs);
 
         // Send the newly processed packet over USB for ROS LaserScan
-        (void) xQueueSendToBack(pHndl->usb.tx, &ldrpkt, 10);
+        (void) xQueueSendToBack(pHndl->usb_tx, &ldrpkt, 10);
     }
 }

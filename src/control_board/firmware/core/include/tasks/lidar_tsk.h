@@ -36,9 +36,10 @@ struct lidar_tsk {
     // Output Queue
     struct ctrl_queue cvtx;
 
-    struct {
-        QueueHandle_t rx, tx;
-    } usb;
+    // usb output queue
+    QueueHandle_t usb_tx;
+    // lidar packet queue from rplidar sensors
+    QueueHandle_t lidar_rx;
 
     // RPLiDAR Sensors
     RpLidar_t rplidar[2];
@@ -51,7 +52,8 @@ struct lidar_tsk {
 };
 
 extern CtrlQueueHndl_t lidar_tsk_init(struct lidar_tsk *pHndl,
-                                        //   QueueHandle_t usb_rx,
-                                          QueueHandle_t usb_tx);
+                                        Serial_t *port_lidar_front,
+                                        Serial_t *port_lidar_vertical,
+                                        QueueHandle_t usb_tx);
 
 #endif
