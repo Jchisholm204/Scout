@@ -86,7 +86,7 @@ void Init(void) {
 
     // dummy serial port
     Serial_t *Serial2 =
-        serial_init(eSerial2, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_RX);
+        serial_init(eSerial2, /*baud*/ 115200, PIN_CAN1_RX, PIN_CAN1_TX);
     // Register Serial Port 5 as STDIO
     // (Use this serial port for printf)
     register_stdio(Serial5);
