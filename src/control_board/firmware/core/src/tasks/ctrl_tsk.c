@@ -206,12 +206,22 @@ void vCtrlTsk(void *pvParams) {
             last_collision_time = xTaskGetTickCount();
         }
 
+        // Hendrix can remove this later
+        // Stops XY lidar data (collision detection)
+        cs_collision.cv.y = 0;
+        cs_collision.cv.x = 0;
+
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
         cv_final = ctrl_run_controllers(pHndl, cv_usb, cs_collision);
 
-        // Send out control outputs
-        cv_final.z = (cv_final.z * 2.0) - 1.0;
+        if (cv_usb.z < 0.05) {
+
+            cv_final.z = -1.0;
+        } else {
+            // Send out control outputs
+            cv_final.z = (cv_final.z * 2.0) - 1.0;
+        }
 
         // USB Control Output
         struct udev_pkt_ctrl_rx pkt_rx = (struct udev_pkt_ctrl_rx) {0};
