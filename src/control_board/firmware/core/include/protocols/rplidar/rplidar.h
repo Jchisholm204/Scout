@@ -274,7 +274,7 @@ typedef QueueHandle_t RpLidarQueueHandle_t;
 
 typedef struct {
     // enum eCBLidar id; eCBLidarFront = 0U; eCBLidarVertical = 1U;
-    uint8_t id;
+    uint8_t id : 1;
     Serial_t* pSerial;
 
     // Task information (Maybe not needed)

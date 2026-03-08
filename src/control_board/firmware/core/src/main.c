@@ -82,10 +82,9 @@ void Init(void) {
     // for port_lidar_front
     Serial_t *Serial3 =
         serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
-    // for port_lidar_vertical
-    // Serial_t *Serial3 =
-    //     serial_init(eSerial3, /*baud*/ RPLIDAR_BAUD, PIN_USART3_RX, PIN_USART3_TX);
+    // TODO: Serial for port_lidar_vertical
 
+    // dummy serial port
     Serial_t *Serial2 =
         serial_init(eSerial2, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_RX);
     // Register Serial Port 5 as STDIO
@@ -99,9 +98,9 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    // CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, usbi->lidar_tx);
-    CtrlQueueHndl_t slq =
-        sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, Serial3, Serial2, usbi->lidar_tx);
+    // CtrlQueueHndl_t slq =
+    //     sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(
         &ctrl_tsk, Serial2, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slq);
 
