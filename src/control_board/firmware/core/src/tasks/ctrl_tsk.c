@@ -188,66 +188,6 @@ void vCtrlTsk(void *pvParams) {
     for (;;) {
         // Ensure a consistent sample time delay
         vTaskDelayUntil(&last_wake_time, CTRL_TSK_RATE);
-
-        // Read input data from the controller (primary source of truth)
-        crsf_rc_t rc;
-        crsf_read_rc(&pHndl->rc_crsf.crsf, &rc);
-
-        // Transmit latest drone updates to the controller
-        crsf_battery_t bat;
-        crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
-        crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
-
-        // // Check the arming condition
-        // if (rc.chan4 < CRSF_CHANNEL_ZERO ||
-        //     pHndl->rc_crsf.crsf.state == eCRSFTimeout) {
-        //     pHndl->mode = eModeDisabled;
-        // }
-        // // Control switch to init mode when arming condition is met
-        // else if (pHndl->mode == eModeDisabled) {
-        //     pHndl->mode = eModeInit;
-        // }
-        // // Control Mode Switching
-        // else if (pHndl->mode != eModeInit) {
-        // Decode operating parameters selections
-        // switch (rc.chan6) {
-        // case CRSF_CHANNEL_MIN:
-        //     pHndl->mode = eModeRC;
-        //     break;
-        // case CRSF_CHANNEL_ZERO:
-        //     pHndl->mode = eModeRCAuto;
-        //     break;
-        // case CRSF_CHANNEL_MAX:
-        //     pHndl->mode = eModeAuto;
-        //     break;
-        // default:
-        //     break;
-        // }
-        pHndl->mode = eModeAuto;
-        //     if (CTRL_CHECK_TIMEOUT(last_usb_time) && pHndl->mode ==
-        //     eModeAuto) {
-        //         // pHndl->mode = eModeFault;
-        //         pHndl->faults |= eFaultUSB;
-        //     } else {
-        //         pHndl->faults &= ~((unsigned) eFaultUSB);
-        //     }
-        //     if (CTRL_CHECK_TIMEOUT(last_collision_time) &&
-        //         pHndl->mode == eModeAuto) {
-        //         // pHndl->mode = eModeFault;
-        //         pHndl->faults |= eFaultLiDAR;
-        //     } else {
-        //         pHndl->faults &= ~((unsigned) eFaultLiDAR);
-        //     }
-        //     if (pHndl->rc_crsf.crsf.state != eCRSFOK) {
-        //         // pHndl->mode = eModeFault;
-        //         pHndl->faults |= eFaultCRSF;
-        //     } else {
-        //         pHndl->faults &= ~((unsigned) eFaultCRSF);
-        //     }
-        // } else if (pHndl->mode == eModeInit) {
-        //     pHndl->mode = eModeStalled;
-        // }
-
         pHndl->mode = eModeAuto;
 
         // Read input data from the USB interface
@@ -268,29 +208,7 @@ void vCtrlTsk(void *pvParams) {
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
-        switch (pHndl->mode) {
-        case eModeInit:
-            break;
-        case eModeRC:
-            cv_final = ctrl_run_manual(pHndl);
-            break;
-        case eModeStalled:
-            cv_final =
-                ctrl_run_controllers(pHndl, (ctrl_vec_t) {0}, cs_collision);
-            break;
-        case eModeRCAuto:
-            cv_final = ctrl_run_controllers(pHndl,
-                                            ctrl_run_manual(pHndl),
-                                            cs_collision);
-            break;
-        case eModeAuto:
-            cv_final = ctrl_run_controllers(pHndl, cv_usb, cs_collision);
-            break;
-        case eModeDisabled:
-        case eModeFault:
-            ctrl_reset_controllers(pHndl);
-            break;
-        }
+        cv_final = ctrl_run_controllers(pHndl, cv_usb, cs_collision);
 
         // Send out control outputs
         cv_final.z = (cv_final.z * 2.0) - 1.0;
@@ -302,17 +220,6 @@ void vCtrlTsk(void *pvParams) {
             pkt_rx.cv.data[i] = (float) cs_collision.cv.data[i];
         }
         (void) xQueueGenericSend(pHndl->usb.rx, &pkt_rx, 1, queueOVERWRITE);
-
-        // CRSF Output to Flight Controller
-        crsf_rc_t fc_out = {0};
-        // AETR Mappings
-        fc_out.chan0 = crsf_unnormal(cv_final.x);
-        fc_out.chan1 = crsf_unnormal(cv_final.y);
-        fc_out.chan2 = crsf_unnormal(cv_final.z);
-        fc_out.chan3 = crsf_unnormal(cv_final.w);
-        // Map the arming channel directly from the controller
-        fc_out.chan4 = rc.chan4;
-        crsf_write_rc(&pHndl->fc_crsf.crsf, &fc_out);
 
         // Increment the heartbeat
         pHndl->heartbeat++;

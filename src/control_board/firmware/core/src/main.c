@@ -34,13 +34,13 @@
 
 // Task Includes
 #include "tasks/ctrl_tsk.h"
-#include "tasks/sim_lidar_tsk.h"
 #include "tasks/lidar_tsk.h"
+#include "tasks/sim_lidar_tsk.h"
 #include "tasks/test_tsks.h"
 
 // Task Structures
 struct ctrl_tsk ctrl_tsk;
-// struct sim_lidar_tsk sim_lidar_tsk;
+struct sim_lidar_tsk sim_lidar_tsk;
 struct lidar_tsk lidar_tsk;
 struct test_tsk test_tsk;
 
@@ -72,7 +72,7 @@ void Init(void) {
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-CtrlQueueHndl_t slqh =
+    CtrlQueueHndl_t slqh =
         sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
     ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
 #elif defined(BOARD_ARMV1)
@@ -80,6 +80,8 @@ CtrlQueueHndl_t slqh =
     Serial_t *Serial5 =
         serial_init(eSerial5, /*baud*/ 115200, PIN_UART5_RX, PIN_UART5_TX);
 
+    Serial_t *Serial2 =
+        serial_init(eSerial2, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_RX);
     // Register Serial Port 5 as STDIO
     // (Use this serial port for printf)
     register_stdio(Serial5);
@@ -91,9 +93,12 @@ CtrlQueueHndl_t slqh =
      * overflow the system memory (128Kb for the STM32f446)
      */
     test_tsk_init(&test_tsk, 1000);
-    CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, usbi->lidar_tx);
-    // ctrl_tsk_init(&ctrl_tsk, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slqh);
-    
+    // CtrlQueueHndl_t slq = lidar_tsk_init(&lidar_tsk, usbi->lidar_tx);
+    CtrlQueueHndl_t slq =
+        sim_lidar_tsk_init(&sim_lidar_tsk, usbi->lidar_rx, usbi->lidar_tx);
+    ctrl_tsk_init(
+        &ctrl_tsk, Serial2, Serial2, usbi->ctrl_rx, usbi->ctrl_tx, slq);
+
 #endif
 
     return;
