@@ -110,7 +110,7 @@ visualization_msgs::msg::Marker Localization::_process_ldr(
         // Calculate current point coordinates
         geometry_msgs::msg::Point current_pt;
         float angle = ldr.angle_min + (i * ldr.angle_increment);
-        current_pt.x = range * sin(angle); //resolving coordinate system into WCS (SLAM Coordinate System)
+        current_pt.x = -range * sin(angle); //NEGATIVE TO MAKE IT WORK IN RVIZ, resolving coordinate system into WCS (SLAM Coordinate System)
         current_pt.y = 0;
         current_pt.z = range * cos(angle);
 

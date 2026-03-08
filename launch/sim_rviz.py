@@ -76,9 +76,9 @@ def generate_launch_description():
             package='simulation',
             executable='telemetry',
             name='sim_telemetry',
-            parameters=[
-                {"pub_rate": 50}
-            ]
+            # parameters=[
+            #     {"pub_rate": 50}
+            # ]
         ),
         # Launch the driver board interface
         Node(
