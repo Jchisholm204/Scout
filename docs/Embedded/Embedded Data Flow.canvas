@@ -1,0 +1,31 @@
+{
+	"nodes":[
+		{"id":"57cd5368d1e656e4","type":"group","x":-20,"y":-300,"width":290,"height":379,"label":"Controller"},
+		{"id":"05506f0113950ccf","type":"text","text":"USB LiDAR Processing","x":-392,"y":-180,"width":250,"height":60},
+		{"id":"4cb514f72bd5eb1a","type":"text","text":"USB LiDAR Input","x":-800,"y":-180,"width":250,"height":60},
+		{"id":"6c5b217c4ab1c5ba","type":"text","text":"RpLiDAR Input","x":-800,"y":-51,"width":250,"height":60},
+		{"id":"341a620396fb185d","type":"text","text":"RpLiDAR Processing","x":-392,"y":-51,"width":250,"height":60},
+		{"id":"18495b87821b8929","type":"text","text":"Drone Control Output","x":460,"y":-180,"width":250,"height":60},
+		{"id":"887c53e68d2e7002","type":"text","text":"USB Control Output","x":460,"y":-64,"width":250,"height":60},
+		{"id":"04c23746ebc804c3","type":"text","text":"USB LiDAR Output","x":23,"y":160,"width":250,"height":60},
+		{"id":"236aecc284394e08","type":"text","text":"Manual Control","x":0,"y":9,"width":250,"height":50},
+		{"id":"66042e2474621f46","type":"text","text":"Automatic","x":0,"y":-280,"width":250,"height":60},
+		{"id":"c045c7e530bbafc0","type":"text","text":"AntiGravity","x":0,"y":-81,"width":250,"height":60},
+		{"id":"641cb1c5881b8147","type":"text","text":"Semi-Automatic","x":0,"y":-180,"width":250,"height":60},
+		{"id":"d25c804910675406","type":"text","text":"Controller Input","x":0,"y":-480,"width":250,"height":60},
+		{"id":"b547dedb7d0fc617","type":"text","text":"USB Control Input","x":-392,"y":-480,"width":250,"height":60}
+	],
+	"edges":[
+		{"id":"de549c43dd619e3a","fromNode":"4cb514f72bd5eb1a","fromSide":"right","toNode":"05506f0113950ccf","toSide":"left"},
+		{"id":"f5ed346dcd00b420","fromNode":"6c5b217c4ab1c5ba","fromSide":"right","toNode":"341a620396fb185d","toSide":"left"},
+		{"id":"2a61058938be2c12","fromNode":"341a620396fb185d","fromSide":"bottom","toNode":"04c23746ebc804c3","toSide":"left"},
+		{"id":"c2d223a10a53f1c7","fromNode":"05506f0113950ccf","fromSide":"bottom","toNode":"04c23746ebc804c3","toSide":"left"},
+		{"id":"5efdee5ddd574bd3","fromNode":"18495b87821b8929","fromSide":"bottom","toNode":"887c53e68d2e7002","toSide":"top"},
+		{"id":"e5e909435833a3a9","fromNode":"05506f0113950ccf","fromSide":"right","toNode":"57cd5368d1e656e4","toSide":"left"},
+		{"id":"e7f55b2432368df8","fromNode":"341a620396fb185d","fromSide":"right","toNode":"57cd5368d1e656e4","toSide":"left"},
+		{"id":"0c441e2f9b89d2db","fromNode":"57cd5368d1e656e4","fromSide":"right","toNode":"18495b87821b8929","toSide":"left"},
+		{"id":"ec4e951ea772af9e","fromNode":"57cd5368d1e656e4","fromSide":"right","toNode":"887c53e68d2e7002","toSide":"left"},
+		{"id":"49aa770a0ef6b53e","fromNode":"b547dedb7d0fc617","fromSide":"bottom","toNode":"57cd5368d1e656e4","toSide":"top"},
+		{"id":"30ab0019cd83b2e8","fromNode":"d25c804910675406","fromSide":"bottom","toNode":"57cd5368d1e656e4","toSide":"top"}
+	]
+}

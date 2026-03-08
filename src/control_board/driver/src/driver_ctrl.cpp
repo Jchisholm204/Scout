@@ -11,13 +11,12 @@
 
 #include "driver/driver.hpp"
 
-int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt, enum eCBMode mode) {
+int Driver::_usb_send_ctrl(const geometry_msgs::msg::Quaternion& qt) {
     struct udev_pkt_ctrl_tx pkt;
     pkt.vel.x = qt.x;
     pkt.vel.y = qt.y;
     pkt.vel.z = qt.z;
     pkt.vel.w = qt.w;
-    pkt.mode = mode;
     int transfered = 0;
     _lusb_err = libusb_bulk_transfer(_lusb_hndl, CTRL_RXD_EP, (uint8_t*) &pkt,
                                      sizeof(struct udev_pkt_ctrl_tx), &transfered, 0);
@@ -74,10 +73,11 @@ void Driver::_ctrl_callback(void) {
     qt.z = pkt_rx.vel.z;
     qt.w = pkt_rx.vel.w;
     _vel_cmd_pub->publish(qt);
-}
-
-void Driver::_mode_callback(std_msgs::msg::UInt8& new_mode) {
-    _new_mode = (enum eCBMode) new_mode.data;
+    qt.x = pkt_rx.cv.x;
+    qt.y = pkt_rx.cv.y;
+    qt.z = pkt_rx.cv.z;
+    qt.w = pkt_rx.cv.w;
+    _col_cmd_pub->publish(qt);
 }
 
 void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
@@ -88,5 +88,5 @@ void Driver::_vel_callback(const geometry_msgs::msg::Quaternion& qt) {
             return;
         }
     }
-    _usb_send_ctrl(qt, _new_mode);
+    _usb_send_ctrl(qt);
 }

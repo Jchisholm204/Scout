@@ -13,11 +13,12 @@
 #define _USB_CB_DEFS_H_
 
 enum eCBMode {
+    eModeDisabled,
     eModeInit,
-    eModeStalled,
     eModeRC,
-    eModeNormal,
-    eModeSim,
+    eModeRCAuto,
+    eModeAuto,
+    eModeStalled,
     eModeFault
 };
 
@@ -25,6 +26,14 @@ enum eCBStatus {
     eStatusOK,
     eStatusFault,
     eStatusBlocked,
+};
+
+enum eCBFault {
+    eFaultOK = 0U,
+    eFaultLiDAR = 1U,
+    eFaultCRSF = 2U,
+    eFaultUSB = 4U,
+    eFaultCollision = 8U,
 };
 
 enum eCBLidar {

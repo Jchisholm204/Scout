@@ -58,6 +58,8 @@ void Init(void) {
         serial_init(eSerial3, /*baud*/ 115200, PIN_USART3_RX, PIN_USART3_TX);
     Serial_t *Serial2 =
         serial_init(eSerial2, /*baud*/ CRSF_BAUD, PIN_USART2_RX, PIN_USART2_TX);
+    Serial_t *Serial5 =
+        serial_init(eSerial5, /*baud*/ CRSF_BAUD, PIN_UART5_RX, PIN_UART5_TX);
 
     // Register Serial Port 3 as STDIO
     // (Use this serial port for printf)

@@ -27,6 +27,9 @@
 #define PIN_USART6_RX PIN('G', 9)
 #define PIN_USART6_TX PIN('G', 14)
 
+#define PIN_UART5_RX PIN('D', 2)
+#define PIN_UART5_TX PIN('C', 12)
+
 // #define PIN_CAN1_RX PIN('A', 0)
 // #define PIN_CAN1_TX PIN('A', 0)
 

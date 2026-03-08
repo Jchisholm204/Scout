@@ -75,7 +75,7 @@ void Driver::_ls_vertical_callback(const sensor_msgs::msg::LaserScan& ls) {
         int i = 0;
         for (; i < UDEV_LIDAR_POINTS && total_len < UDEV_LIDAR_RANGE; i++) {
             float d = ls.ranges[total_len];
-            if (d < 0.1 || !std::isfinite(d) || d > 45.0f)
+            if (d < 0.5 || !std::isfinite(d) || d > 12.0f)
                 ldr_pkt.distances[i] = 0;
             else
                 ldr_pkt.distances[i] = (uint16_t) (d * 4000.0f);
@@ -124,5 +124,5 @@ void Driver::_lidar_callback(void) {
             }
         }
     }
-    RCLCPP_INFO(this->get_logger(), "Published Points");
+    // RCLCPP_INFO(this->get_logger(), "Published Points");
 }
