@@ -102,9 +102,8 @@ void vLidarTsk(void *pvParams) {
         int valid_points = 0;
         for (int i = 0; i < ldrpkt.hdr.len; i++) {
             float d = (float) ldrpkt.distances[i] / 4000.0f;
-            // TODO: might have to change the max distance check to since the rplidar datasheet says accuracy outside the range [0.05, 12.0] cannot be guaranteed.
-            // if (d > 12.0f || d < 0.05f) {
-            if (d > 45.0f || d < 0.1f) {
+            // max and min distances are set according to datasheet (https://www.slamtec.com/en/Support#rplidar-c1) which says accuracy outside the range [0.05, 12.0] cannot be guaranteed.
+            if (d > 12.0f || d < 0.05f) {
                 continue;
             }
             valid_points++;
