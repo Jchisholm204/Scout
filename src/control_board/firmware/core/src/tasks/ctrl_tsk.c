@@ -198,53 +198,57 @@ void vCtrlTsk(void *pvParams) {
         crsf_read_battery(&pHndl->fc_crsf.crsf, &bat);
         crsf_write_battery(&pHndl->rc_crsf.crsf, &bat);
 
-        // Check the arming condition
-        if (rc.chan4 < CRSF_CHANNEL_ZERO ||
-            pHndl->rc_crsf.crsf.state == eCRSFTimeout) {
-            pHndl->mode = eModeDisabled;
-        }
-        // Control switch to init mode when arming condition is met
-        else if (pHndl->mode == eModeDisabled) {
-            pHndl->mode = eModeInit;
-        }
-        // Control Mode Switching
-        else if (pHndl->mode != eModeInit) {
-            // Decode operating parameters selections
-            switch (rc.chan6) {
-            case CRSF_CHANNEL_MIN:
-                pHndl->mode = eModeRC;
-                break;
-            case CRSF_CHANNEL_ZERO:
-                pHndl->mode = eModeRCAuto;
-                break;
-            case CRSF_CHANNEL_MAX:
-                pHndl->mode = eModeAuto;
-                break;
-            default:
-                break;
-            }
-            if (CTRL_CHECK_TIMEOUT(last_usb_time) && pHndl->mode == eModeAuto) {
-                // pHndl->mode = eModeFault;
-                pHndl->faults |= eFaultUSB;
-            } else {
-                pHndl->faults &= ~((unsigned) eFaultUSB);
-            }
-            if (CTRL_CHECK_TIMEOUT(last_collision_time) &&
-                pHndl->mode == eModeAuto) {
-                // pHndl->mode = eModeFault;
-                pHndl->faults |= eFaultLiDAR;
-            } else {
-                pHndl->faults &= ~((unsigned) eFaultLiDAR);
-            }
-            if (pHndl->rc_crsf.crsf.state != eCRSFOK) {
-                // pHndl->mode = eModeFault;
-                pHndl->faults |= eFaultCRSF;
-            } else {
-                pHndl->faults &= ~((unsigned) eFaultCRSF);
-            }
-        } else if (pHndl->mode == eModeInit) {
-            pHndl->mode = eModeStalled;
-        }
+        // // Check the arming condition
+        // if (rc.chan4 < CRSF_CHANNEL_ZERO ||
+        //     pHndl->rc_crsf.crsf.state == eCRSFTimeout) {
+        //     pHndl->mode = eModeDisabled;
+        // }
+        // // Control switch to init mode when arming condition is met
+        // else if (pHndl->mode == eModeDisabled) {
+        //     pHndl->mode = eModeInit;
+        // }
+        // // Control Mode Switching
+        // else if (pHndl->mode != eModeInit) {
+        // Decode operating parameters selections
+        // switch (rc.chan6) {
+        // case CRSF_CHANNEL_MIN:
+        //     pHndl->mode = eModeRC;
+        //     break;
+        // case CRSF_CHANNEL_ZERO:
+        //     pHndl->mode = eModeRCAuto;
+        //     break;
+        // case CRSF_CHANNEL_MAX:
+        //     pHndl->mode = eModeAuto;
+        //     break;
+        // default:
+        //     break;
+        // }
+        pHndl->mode = eModeAuto;
+        //     if (CTRL_CHECK_TIMEOUT(last_usb_time) && pHndl->mode ==
+        //     eModeAuto) {
+        //         // pHndl->mode = eModeFault;
+        //         pHndl->faults |= eFaultUSB;
+        //     } else {
+        //         pHndl->faults &= ~((unsigned) eFaultUSB);
+        //     }
+        //     if (CTRL_CHECK_TIMEOUT(last_collision_time) &&
+        //         pHndl->mode == eModeAuto) {
+        //         // pHndl->mode = eModeFault;
+        //         pHndl->faults |= eFaultLiDAR;
+        //     } else {
+        //         pHndl->faults &= ~((unsigned) eFaultLiDAR);
+        //     }
+        //     if (pHndl->rc_crsf.crsf.state != eCRSFOK) {
+        //         // pHndl->mode = eModeFault;
+        //         pHndl->faults |= eFaultCRSF;
+        //     } else {
+        //         pHndl->faults &= ~((unsigned) eFaultCRSF);
+        //     }
+        // } else if (pHndl->mode == eModeInit) {
+        //     pHndl->mode = eModeStalled;
+        // }
+
+        pHndl->mode = eModeAuto;
 
         // Read input data from the USB interface
         static ctrl_vec_t cv_usb = {0};
