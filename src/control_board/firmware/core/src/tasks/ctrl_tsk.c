@@ -85,15 +85,25 @@ int ctrl_tsk_init(struct ctrl_tsk *pHndl,
 int ctrl_setup_controllers(struct ctrl_tsk *const pHndl) {
 
     // Hover/Z PID
-    pidc_init(&pHndl->pid_z, 0.15, 0.004, 0.95, 0, 0.75);
+    pidc_init(&pHndl->pid_z, 0.12, 0.004, 0.95, 0, 0.75);
     pidc_set_accel(&pHndl->pid_z, 0.1);
     // Hover Constant
-    pidc_set_ff(&pHndl->pid_z, 0.31);
+    pidc_set_ff(&pHndl->pid_z, 0.2819);
 
     pidc_init(&pHndl->pid_x, 0.88, 0, 2.8, -0.6, 0.6);
     pidc_set_accel(&pHndl->pid_x, 1);
     pidc_init(&pHndl->pid_y, 0.88, 0, 2.8, -0.6, 0.6);
     pidc_set_accel(&pHndl->pid_x, 1);
+    // // Hover/Z PID
+    // pidc_init(&pHndl->pid_z, 0.1, 0.01, 0.5, 0, 0.75);
+    // pidc_set_accel(&pHndl->pid_z, 0.1);
+    // // Hover Constant
+    // pidc_set_ff(&pHndl->pid_z, 0.38);
+
+    // pidc_init(&pHndl->pid_x, 0.88, 0, 2.8, -0.6, 0.6);
+    // pidc_set_accel(&pHndl->pid_x, 1);
+    // pidc_init(&pHndl->pid_y, 0.88, 0, 2.8, -0.6, 0.6);
+    // pidc_set_accel(&pHndl->pid_x, 1);
 
     return 0;
 }
