@@ -253,21 +253,38 @@ geometry_msgs::msg::Point Planner::convert_DCS_to_WCS(const geometry_msgs::msg::
 void Planner::update_waypoint(void) {
     printf("Updating Waypoint\n Number of midpoints: %zu\n", waypoints_W.size());
     
-    if ((!waypoints_W.empty()) && _position.has_value()) { //first time this fails
-        //convert to WCS and add to tree
+    if ((!waypoints_W.empty()) && _position.has_value()) { 
+        
+        // 1. Recreate the Drone-to-World transform
+        tf2::Quaternion q_orig;
+        tf2::fromMsg(_orientation, q_orig);
+        tf2::Transform transform_W_D(
+            q_orig, 
+            tf2::Vector3(_position.value().x, _position.value().y, _position.value().z)
+        );
+
+        // 2. Invert it to get the World-to-Drone (WCS to DCS) transform
+        tf2::Transform transform_D_W = transform_W_D.inverse();
+
         for (const auto& waypoint_W : waypoints_W){
-            printf("Updating Waypoint W: %f %f %f\n", waypoint_W.x, waypoint_W.y, waypoint_W.z);
-            if( waypoint_W.x > _position.value().x ) {
+            printf("Checking Waypoint W: %f %f %f\n", waypoint_W.x, waypoint_W.y, waypoint_W.z);
+            
+            // 3. Convert the WCS waypoint into the Drone Coordinate System
+            tf2::Vector3 pt_W(waypoint_W.x, waypoint_W.y, waypoint_W.z);
+            tf2::Vector3 pt_D = transform_D_W * pt_W;
+
+            // 4. Check if it is in front of the drone (DCS y-axis is positive)
+            if( pt_D.y() > 0.0 ) {
                 //update waypoint
                 current_waypoint.header.frame_id = world_frame;
                 current_waypoint.header.stamp = this->now();
-                current_waypoint.point = waypoint_W;
-                // For now, just take the first one that satisfies the condition
+                current_waypoint.point = waypoint_W; // Store the original WCS point
+                // Take the first one that satisfies the condition
                 break;
             }
         }
     }
-} 
+}
 
 void Planner::ctrl_callback(void) {
 
