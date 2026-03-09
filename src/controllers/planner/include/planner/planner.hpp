@@ -68,7 +68,7 @@ class Planner : public rclcpp::Node {
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _movement_pub;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr _waypoint_pub;
     rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr _imu_transform_pub;
-
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr _dcs_waypoint_pub;
 
     // Runtime
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
@@ -107,7 +107,11 @@ class Planner : public rclcpp::Node {
     std::string world_frame;
     std::string drone_frame;
 
-    geometry_msgs::msg::Point convert_DCS_to_WCS(geometry_msgs::msg::Point waypoint_DCS, geometry_msgs::msg::Point position, geometry_msgs::msg::Quaternion orientation);
+    geometry_msgs::msg::Point convert_DCS_to_WCS(
+      const geometry_msgs::msg::Point& waypoint_DCS, 
+      const geometry_msgs::msg::Point& position, 
+      const geometry_msgs::msg::Quaternion& orientation
+  );    
     void update_waypoint(void);
 
 };

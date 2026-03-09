@@ -39,6 +39,7 @@ Planner::Planner() : Node("path_planner") {
     this->declare_parameter("world_frame", "world");
     this->declare_parameter("startup_delay_ms", 4000);
     this->declare_parameter("imu_transform_topic", "/planner/imu_orientation");
+    this->declare_parameter("dcs_waypoint_topic", "/planner/dcs_waypoints");
     // this->declare_parameter("slam_topic", "/sim/position"); //change to actual SLAM topic when available
 
     std::string imu_topic = this->get_parameter("imu_topic").as_string();
@@ -54,7 +55,7 @@ Planner::Planner() : Node("path_planner") {
     this->world_frame = this->get_parameter("world_frame").as_string();
     int startup_delay_ms = this->get_parameter("startup_delay_ms").as_int();
     std::string imu_transform_topic = this->get_parameter("imu_transform_topic").as_string();
-
+    std::string dcs_waypoint_topic = this->get_parameter("dcs_waypoint_topic").as_string();
     // std::string slam_topic = this->get_parameter("slam_topic").as_string();
 
     // Create Subscriptions to drone topics
@@ -95,7 +96,8 @@ Planner::Planner() : Node("path_planner") {
 
     _imu_transform_pub =
         this->create_publisher<geometry_msgs::msg::TransformStamped>(imu_transform_topic, 10);
-
+    _dcs_waypoint_pub = 
+        this->create_publisher<visualization_msgs::msg::Marker>(dcs_waypoint_topic, 10);
     // Deferred init: wait for wall markers, open markers, and position data to arrive
     _init_timer = this->create_wall_timer(
         std::chrono::milliseconds(startup_delay_ms),
@@ -110,7 +112,7 @@ Planner::Planner() : Node("path_planner") {
                                           std::bind(&Planner::ctrl_callback, this));
 
     // Initialize orientation to identity to avoid math errors before SLAM starts
-    _orientation_abs.w = 1.0;
+    _orientation.w = 1.0;
 }
 
 Planner::~Planner() {
@@ -122,26 +124,10 @@ void Planner::_init_waypoint_callback(void) {
     update_waypoint();
 }
 
-void Planner::_imu_callback(const sensor_msgs::msg::Imu& imu) {
-    tf2::Quaternion q_sim;
-    tf2::fromMsg(imu.orientation, q_sim);
+void Planner::_imu_callback(const sensor_msgs::msg::Imu& imu) { 
+    this->_orientation = imu.orientation;
+    this->_imu = imu;
 
-    // 1. Define the Basis Transformation Matrix
-    // Mapping: WCS_x = Sim -y | WCS_y = Sim -z | WCS_z = Sim x
-    tf2::Matrix3x3 m_basis(
-         0, -1,  0,  // New X-axis is Sim -Y
-         0,  0, -1,  // New Y-axis is Sim -Z
-         1,  0,  0   // New Z-axis is Sim X
-    );
-    
-    // 2. Transform the orientation into the new world frame
-    tf2::Matrix3x3 m_sim(q_sim);
-    tf2::Matrix3x3 m_logic = m_basis * m_sim * m_basis.transpose();
-    
-    tf2::Quaternion q_logic;
-    m_logic.getRotation(q_logic);
-    _orientation_abs = tf2::toMsg(q_logic); // This is what your control logic uses
-    
     if (!_position.has_value()) return;
 
     // 3. Update the TF Broadcast
@@ -155,7 +141,7 @@ void Planner::_imu_callback(const sensor_msgs::msg::Imu& imu) {
     transform.transform.translation.z = _position.value().z;
 
     // IMPORTANT: Use the transformed orientation, not the raw sim orientation!
-    transform.transform.rotation = _orientation_abs; 
+    transform.transform.rotation = _orientation;
     
     _tf_broadcaster->sendTransform(transform);
 }
@@ -181,20 +167,41 @@ void Planner::_open_marker_callback(const visualization_msgs::msg::Marker& msg) 
 
     _open_markers = msg;
     waypoints_W.clear();
-    // Assuming markers are LINE_LIST where every 2 points define a gate/gap LOOK AT PARSING
+
+    // ADD THIS: Initialize the DCS visualization marker
+    visualization_msgs::msg::Marker dcs_marker;
+    dcs_marker.header.frame_id = drone_frame; // Keep it in the drone frame
+    dcs_marker.header.stamp = this->now();
+    dcs_marker.ns = "dcs_waypoints";
+    dcs_marker.id = 0;
+    dcs_marker.type = visualization_msgs::msg::Marker::SPHERE_LIST; // Spheres are easy to see in RViz
+    dcs_marker.action = visualization_msgs::msg::Marker::ADD;
+    dcs_marker.scale.x = 1; // Adjust size as needed
+    dcs_marker.scale.y = 1;
+    dcs_marker.scale.z = 1;
+    dcs_marker.color.r = 0.0f;
+    dcs_marker.color.g = 0.5f;
+    dcs_marker.color.b = 1.0f; // Make them blue to distinguish from your green open spaces
+    dcs_marker.color.a = 1.0f;
+
+    // Assuming markers are LINE_LIST where every 2 points define a gate/gap
     if (msg.type == visualization_msgs::msg::Marker::LINE_LIST) {
         for (size_t i = 0; i + 1 < msg.points.size(); i += 2) {
             geometry_msgs::msg::Point mid;
             mid.x = (msg.points[i].x + msg.points[i+1].x) / 2.0;
-            mid.y = (msg.points[i].y + msg.points[i+1].y) / 2.0; //this is prolly 0
+            mid.y = (msg.points[i].y + msg.points[i+1].y) / 2.0; 
             mid.z = (msg.points[i].z + msg.points[i+1].z) / 2.0; 
-            printf("Midpoint: %f %f %f\n", mid.x, mid.y, mid.z);
 
-            mid = this->convert_DCS_to_WCS(mid, _position.value(), _orientation_abs); //convert to WCS
-            printf("Midpoint WCS: %f %f %f\n", mid.x, mid.y, mid.z);
+            // ADD THIS: Push the raw DCS midpoint to the visualization marker
+            dcs_marker.points.push_back(mid);
+
+            mid = this->convert_DCS_to_WCS(mid, _position.value(), _orientation); //convert to WCS
             waypoints_W.push_back(mid);
         }
     }
+    
+    // ADD THIS: Publish the DCS marker
+    _dcs_waypoint_pub->publish(dcs_marker);
 }
 
 void Planner::_pos_callback(const geometry_msgs::msg::Point& position) {
@@ -202,9 +209,7 @@ void Planner::_pos_callback(const geometry_msgs::msg::Point& position) {
         _position = geometry_msgs::msg::Point(); 
     }
     
-    this->_position->x = -position.y;
-    this->_position->y = -position.z;
-    this->_position->z = position.x;
+    this->_position = position;
 }
 
 void Planner::_vel_callback(const geometry_msgs::msg::Vector3& velocity) { //Not used anywhere
@@ -216,38 +221,27 @@ void Planner::_vel_callback(const geometry_msgs::msg::Vector3& velocity) { //Not
 //     this->_orientation_abs = msg.pose.orientation;
 // }
 
-// only rotates around y-axis, not x or z
-geometry_msgs::msg::Point Planner::convert_DCS_to_WCS( geometry_msgs::msg::Point waypoint_DCS, geometry_msgs::msg::Point position, geometry_msgs::msg::Quaternion orientation)
+geometry_msgs::msg::Point Planner::convert_DCS_to_WCS(const geometry_msgs::msg::Point& waypoint_DCS, const geometry_msgs::msg::Point& position, const geometry_msgs::msg::Quaternion& orientation)
 {
-    // 1. Setup Translation
-    tf2::Vector3 translation(position.x, position.y, position.z);
-
-    // 2. Isolate Y-axis Rotation
-    tf2::Quaternion original_rotation;
-    tf2::fromMsg(orientation, original_rotation);
-
-    // Convert to Euler angles to separate axes
-    tf2::Matrix3x3 mat(original_rotation);
-    double roll, pitch, yaw;
-    mat.getRPY(roll, pitch, yaw); 
-
-    // Rebuild the quaternion using ONLY the pitch (Y-axis rotation)
-    tf2::Quaternion y_only_rotation;
-    y_only_rotation.setRPY(0.0, pitch, 0.0);
-
-    // 3. Setup Transform
-    tf2::Transform transform_W_D;
-    transform_W_D.setOrigin(translation);
-    transform_W_D.setRotation(y_only_rotation);
-
-    // 4. Create Waypoint Vector
-    tf2::Vector3 waypoint(waypoint_DCS.x, waypoint_DCS.y, waypoint_DCS.z);
-
-    // 5. Apply Full Transformation (Rotation + Translation)
-    // FIX: Using transform operator instead of 'translation + waypoint'
-    tf2::Vector3 waypoint_WCS = transform_W_D * waypoint;
+    // 1. Convert the orientation message to a tf2::Quaternion
+    tf2::Quaternion q_orig;
+    tf2::fromMsg(orientation, q_orig);
     
-    // 6. Construct output
+    // (Optional debugging: you can still extract and print the yaw if needed)
+    // double roll, pitch, yaw;
+    // tf2::Matrix3x3(q_orig).getRPY(roll, pitch, yaw); 
+    // printf("Yaw: %f\n", yaw);
+
+    // 2. Initialize Transform directly with the full 3D rotation and translation
+    tf2::Transform transform_W_D(
+        q_orig, 
+        tf2::Vector3(position.x, position.y, position.z)
+    );
+
+    // 3. Apply Transform to the waypoint
+    tf2::Vector3 waypoint_WCS = transform_W_D * tf2::Vector3(waypoint_DCS.x, waypoint_DCS.y, waypoint_DCS.z);
+    
+    // 4. Construct and return output
     geometry_msgs::msg::Point p;
     p.x = waypoint_WCS.x();
     p.y = waypoint_WCS.y();
@@ -256,22 +250,14 @@ geometry_msgs::msg::Point Planner::convert_DCS_to_WCS( geometry_msgs::msg::Point
     return p;
 }
 
-
 void Planner::update_waypoint(void) {
     printf("Updating Waypoint\n Number of midpoints: %zu\n", waypoints_W.size());
-    for (const auto& waypoint : waypoints_W) {
-        printf("Midpoint: %f %f %f\n", waypoint.x, waypoint.y, waypoint.z);
-    }
-
     
     if ((!waypoints_W.empty()) && _position.has_value()) { //first time this fails
         //convert to WCS and add to tree
         for (const auto& waypoint_W : waypoints_W){
-            printf("Waypoint W: %f %f %f\n", waypoint_W.x, waypoint_W.y, waypoint_W.z);
-            if( waypoint_W.x < _position.value().x ) {
-                //add elements to waypoints tree "waypoints"
-                // waypoints.add(waypoint_W)
-
+            printf("Updating Waypoint W: %f %f %f\n", waypoint_W.x, waypoint_W.y, waypoint_W.z);
+            if( waypoint_W.x > _position.value().x ) {
                 //update waypoint
                 current_waypoint.header.frame_id = world_frame;
                 current_waypoint.header.stamp = this->now();
@@ -292,26 +278,25 @@ void Planner::ctrl_callback(void) {
         return;
     }
 
-    // 1. Check waypoint distance (X-Z plane only)
+    // 1. Check waypoint distance (X-Y plane only)
     double dx = current_waypoint.point.x - _position.value().x;
-    double dz = current_waypoint.point.z - _position.value().z;
-    double dist = std::sqrt(dx*dx + dz*dz);
+    double dy = current_waypoint.point.y - _position.value().y;
+    double dist = std::sqrt(dx*dx + dy*dy);
     
-    if(dist < 0.5){ // Threshold
+    if(dist < 2){ // Threshold
         update_waypoint();
-        // Recalculate dx, dz, and dist for the new waypoint
+        // Recalculate dx, dy, and dist for the new waypoint
         dx = current_waypoint.point.x - _position.value().x;
-        dz = current_waypoint.point.z - _position.value().z;
-        dist = std::sqrt(dx*dx + dz*dz);
+        dy = current_waypoint.point.y - _position.value().y;
+        dist = std::sqrt(dx*dx + dy*dy);
     }
-
     cmd.y = 0.00;
 
     printf("Current Waypoint: %f %f %f\n", current_waypoint.point.x, current_waypoint.point.y, current_waypoint.point.z);
     printf("Current Position: %f %f %f\n", _position.value().x, _position.value().y, _position.value().z);
 
     // Check if current_waypoint is valid
-    if (std::abs(current_waypoint.point.x) > 0.001 && std::abs(current_waypoint.point.z) > 0.001) { 
+    if (std::abs(current_waypoint.point.x) > 0.001 && std::abs(current_waypoint.point.y) > 0.001) { 
         
         // --- DISTANCE ERROR (Magnitude) ---
         // 'dist' is exactly the magnitude of the distance in the X-Z plane
@@ -319,15 +304,22 @@ void Planner::ctrl_callback(void) {
 
         // --- HEADING ERROR (Rotation) ---
         // 1. Calculate intended global heading towards waypoint in X-Z plane
-        double target_heading = std::atan2(dx, dz);
+        double target_heading = std::atan2(dy, dx);
+        printf("Target Heading: %f\n", target_heading);
 
-        // 2. Get current global heading (Y-axis rotation / Pitch)
+        // 2. Get current global heading based on the DCS Y-axis (Forward)
         tf2::Quaternion rot_W;
-        tf2::fromMsg(_orientation_abs, rot_W);
-        tf2::Matrix3x3 mat(rot_W);
-        double roll, pitch, yaw;
-        mat.getRPY(roll, pitch, yaw); 
-        double current_heading = pitch; 
+        tf2::fromMsg(_orientation, rot_W);
+        
+        // Define the forward direction in your DCS (the Y-axis)
+        tf2::Vector3 forward_DCS(0.0, 1.0, 0.0);
+
+        // Rotate this forward vector into the World Coordinate System
+        tf2::Vector3 forward_WCS = tf2::quatRotate(rot_W, forward_DCS);
+
+        // Calculate the heading of this forward vector in the global X-Y plane
+        double current_heading = std::atan2(forward_WCS.y(), forward_WCS.x());
+        printf("Current Heading: %f\n", current_heading);
 
         // 3. Calculate heading error
         double heading_error = target_heading - current_heading;
@@ -339,11 +331,11 @@ void Planner::ctrl_callback(void) {
 
 
         cmd.x = .005 * distance_error; // Forward tilt based on distance
-        cmd.w = .5 * heading_error;   // Spin based on heading difference
+        cmd.w = -.7 * heading_error;   // Spin based on heading difference
         cmd.z = 0.1; // Kept from your original code
         
         // --- LIMITERS ---
-        if(cmd.x > 0.1) cmd.x = 0.1;
+        if(cmd.x > 0.075) cmd.x = 0.075;
         // Since distance is always positive, cmd.x won't be negative here 
         // unless you want the drone to tilt backwards if it overshoots.
         
