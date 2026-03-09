@@ -216,10 +216,9 @@ void vCtrlTsk(void *pvParams) {
             last_collision_time = xTaskGetTickCount();
         }
 
-        // Hendrix can remove this later
         // Stops XY lidar data (collision detection)
-        cs_collision.cv.y = 0;
-        cs_collision.cv.x = 0;
+        // cs_collision.cv.y = 0;
+        // cs_collision.cv.x = 0;
 
         // Run controllers to get output control vector
         ctrl_vec_t cv_final = {0};
