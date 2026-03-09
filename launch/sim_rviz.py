@@ -81,11 +81,11 @@ def generate_launch_description():
             ]
         ),
         # Launch the driver board interface
-        Node(
-            package='control_board',
-            executable='driver',
-            name='cb_interface',
-        ),
+        # Node(
+        #     package='control_board',
+        #     executable='driver',
+        #     name='cb_interface',
+        # ),
         # Launch the LiDAR Segmentation Node
         # Node(
         #     package='laser_segmentation',
