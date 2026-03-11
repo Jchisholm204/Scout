@@ -19,13 +19,10 @@
 #include <string.h>
 
 Telemetry::Telemetry() : Node("sim_telemetry") {
-    this->declare_parameter("pub_base", "sim");
-    // Set to the Jetson SLAM refresh rate
-    this->declare_parameter("pub_rate", 50);
 
-    std::string pub_base =
-        this->get_parameter("pub_base").as_string();
-    int64_t pub_rate = this->get_parameter("pub_rate").as_int();
+    std::string pub_base = this->declare_parameter("pub_base", "sim");
+    // Set to the Jetson SLAM refresh rate (default 50)
+    int64_t pub_rate = this->declare_parameter("pub_rate", 50);
 
     // Sanitize Parameters
     if (pub_rate < 0) {
@@ -71,13 +68,22 @@ Telemetry::~Telemetry() {
 }
 
 void Telemetry::_callback(void) {
+    // Log to confirm the callback is being triggered by the timer
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "Telemetry callback running...");
+
     lf_telemetry_packet_t telem_pkt;
     ssize_t n = recvfrom(_udp_fp, &telem_pkt, sizeof(lf_telemetry_packet_t), MSG_DONTWAIT,
                          NULL, NULL);
-    if(n != sizeof(lf_telemetry_packet_t)){
+    if (n < 0 || (size_t)n < sizeof(lf_telemetry_packet_t)) {
+        // Using WARN_THROTTLE to avoid spamming the console if no data is being sent
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid or no telemetry data received. Packet size: %ld, Expected: %ld", n, sizeof(lf_telemetry_packet_t));
         return;
     }
     
+    // Similar to the lidarstreams node, log some of the received data to confirm it's valid
+    RCLCPP_INFO(this->get_logger(), "Timestamp: %.2f, PosX: %.2f, BatV: %.2f",
+                telem_pkt.timestamp, telem_pkt.posX, telem_pkt.batVolt);
+
     sensor_msgs::msg::BatteryState batt_msg;
     batt_msg.percentage = telem_pkt.batPct;
     batt_msg.voltage = telem_pkt.batVolt;

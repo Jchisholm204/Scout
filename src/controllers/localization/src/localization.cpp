@@ -67,7 +67,7 @@ void Localization::_hldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
     const auto& p_end_current = walls.points[i+1];
     const auto& p_start_next = walls.points[i+2];
 
-    // Calculate distance between segments
+    // Calculate distance between segments (in WCS xy plane; z=0 for lidar scan)
     float dx = p_start_next.x - p_end_current.x;
     float dy = p_start_next.y - p_end_current.y;
     float gap_dist = sqrt(dx*dx + dy*dy);
@@ -110,8 +110,8 @@ visualization_msgs::msg::Marker Localization::_process_ldr(
         // Calculate current point coordinates
         geometry_msgs::msg::Point current_pt;
         float angle = ldr.angle_min + (i * ldr.angle_increment);
-        current_pt.x = range * cos(angle);
-        current_pt.y = range * sin(angle);
+        current_pt.x = -range * sin(angle); //assuming x is left a y is forward in DCS(sim)
+        current_pt.y = range * cos(angle);
         current_pt.z = 0;
 
         if (!first_point_captured) {
