@@ -11,6 +11,8 @@
 
 #include "planner/planner.hpp"
 
+#include "planner/navtree.hpp"
+
 #include <tf2/LinearMath/Quaternion.h>
 #include <unistd.h>
 
@@ -116,8 +118,7 @@ void Planner::ctrl_callback(void) {
     if (_open_markers.points.size() >= 1) {
         cmd.x = 0.01 * _open_markers.points[0].y;
         cmd.w = -0.05 * _open_markers.points[0].x;
-    }
-    else{
+    } else {
         cmd.x = 0;
         cmd.w = 0;
     }
