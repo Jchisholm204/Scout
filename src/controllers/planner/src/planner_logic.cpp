@@ -28,6 +28,7 @@ void Planner::_nav_mode_init(void) {
     // Set the target to the closest node
     _nav_target = _navtree.get_nearest(_position);
     _nav_mode = eNavMode::eNavigating;
+    _nav_time = this->now();
 }
 
 void Planner::_nav_mode_nav(void) {
@@ -57,18 +58,19 @@ void Planner::_nav_mode_nav(void) {
 
         // 5. Control Gains
         // cmd.x = Pitch (Forward/Back). cmd.w = Yaw Rate.
-        if (dist > 0.5) {
-            cmd.x = 0.02 * local_x;         // Move forward based on local X error
+        if (dist > 1.1) {
+            cmd.x = 0.04 * local_x;         // Move forward based on local X error
             cmd.w = 0.95 * target_yaw_diff; // Turn based on angular error
 
             // Optional: Limit speeds so it doesn't flip
-            cmd.x = std::clamp(cmd.x, -0.1, 0.1);
+            cmd.x = std::clamp(cmd.x, -0.15, 0.15);
             cmd.w = std::clamp(cmd.w, -0.6, 0.6);
             _lock_orientation = _imu.orientation;
         } else {
             // Arrival Logic: Mark as visited and find next
             _navtree.set_visited(_nav_target, true);
-            _nav_mode = eNavMode::eScanning;
+            _nav_time = this->now();
+            _nav_mode = eNavMode::eWaitForScan;
             // _nav_target = nullptr; // Next loop will trigger search for new target
         }
     }
@@ -82,7 +84,7 @@ void Planner::_nav_mode_nav(void) {
     _movement_pub->publish(cmd);
 }
 
-void Planner::_nav_mode_scan(void) {
+void Planner::_nav_mode_wait_for_scan(void) {
     if (!_nav_target)
         return;
 
@@ -135,14 +137,93 @@ void Planner::_nav_mode_scan(void) {
     cmd.z = std::clamp(cmd.z, -0.2, 0.2);
     cmd.w = std::clamp(cmd.w, -0.6, 0.6);
 
+    this->get_clock()->now();
     _movement_pub->publish(cmd);
 
-    RCLCPP_INFO(this->get_logger(),
-                "SCAN LOCK: YawErr: %.3f | LocalErr: X:%.2f Y:%.2f | LocalV: X:%.2f",
-                yaw_error, local_x, local_y, local_vx);
+    RCLCPP_INFO(
+        this->get_logger(),
+        "SCAN LOCK: YawErr: %.3f | LocalErr: X:%.2f Y:%.2f | LocalV: X:%.2f | %.4f",
+        yaw_error, local_x, local_y, local_vx, (this->now() - _nav_time).seconds());
+
+    if ((this->now() - _nav_time).seconds() > 4.5) {
+        RCLCPP_INFO(this->get_logger(), "Triggered Scan Analysis");
+
+        _nav_mode = eNavMode::eScanning;
+        _nav_time = this->now();
+    }
+}
+
+void Planner::_nav_mode_scan(void) {
+    RCLCPP_INFO(this->get_logger(), "SCANNING: Projecting RRT Step...");
+
+    if (_open_markers.points.empty()) {
+        _nav_mode = eNavMode::eBacktracking;
+        _nav_time = this->now();
+        return;
+    }
+
+    auto rpy = quat_to_rot(_imu.orientation);
+    double cos_y = std::cos(rpy[2]);
+    double sin_y = std::sin(rpy[2]);
+
+    NavTree::nav_node_t* best_new_node = nullptr;
+    double min_angle_to_center = 180.0; // To pick the gap most "in front" of us
+    const double RRT_STEP_SIZE = 1.2;
+
+    for (size_t i = 0; i + 1 < _open_markers.points.size(); i += 2) {
+        const auto& p1 = _open_markers.points[i];
+        const auto& p2 = _open_markers.points[i + 1];
+
+        // 1. Find the local midpoint of the gap
+        double mid_x = (p1.x + p2.x) / 2.0;
+        double mid_y = (p1.y + p2.y) / 2.0;
+
+        // 2. Filter: Ignore if behind us
+        if (mid_x < 0.0)
+            continue;
+
+        // 3. RRT PROJECTED STEP
+        // Calculate the unit vector toward the gap midpoint
+        double dist_to_gap = std::hypot(mid_x, mid_y);
+        if (dist_to_gap < 0.5)
+            continue; // Skip gaps we are already inside
+
+        // Project a point exactly 2m away in that direction
+        double step_local_x = (mid_x / dist_to_gap) * RRT_STEP_SIZE;
+        double step_local_y = (mid_y / dist_to_gap) * RRT_STEP_SIZE;
+
+        // 4. Global Transformation
+        geometry_msgs::msg::Point global_pt;
+        global_pt.x = (step_local_x * cos_y - step_local_y * sin_y) + _position.x;
+        global_pt.y = (step_local_x * sin_y + step_local_y * cos_y) + _position.y;
+        global_pt.z = 0.0;
+
+        // 5. Add to Tree
+        // We pick the "best" node based on which one is most aligned with our nose
+        double angle_err = std::abs(std::atan2(step_local_y, step_local_x));
+
+        NavTree::nav_node_t* pNode = _navtree.add_node(global_pt, _nav_target);
+        if (pNode && angle_err < min_angle_to_center) {
+            min_angle_to_center = angle_err;
+            best_new_node = pNode;
+        }
+    }
+
+    // 6. Transition
+    if (best_new_node) {
+        _nav_target = best_new_node;
+        _nav_mode = eNavMode::eNavigating;
+        RCLCPP_INFO(this->get_logger(), "Stepping 2m toward frontier.");
+    } else {
+        _nav_mode = eNavMode::eBacktracking;
+        RCLCPP_INFO(this->get_logger(), "Path blocked or duplicate. Backtracking.");
+    }
+
+    _nav_time = this->now();
 }
 
 void Planner::_nav_mode_backtrack(void) {
+    _nav_mode = eNavMode::eNavigating;
 }
 
 void Planner::ctrl_callback(void) {
@@ -153,6 +234,9 @@ void Planner::ctrl_callback(void) {
         break;
     case eNavMode::eNavigating:
         _nav_mode_nav();
+        break;
+    case eNavMode::eWaitForScan:
+        _nav_mode_wait_for_scan();
         break;
     case eNavMode::eScanning:
         _nav_mode_scan();
