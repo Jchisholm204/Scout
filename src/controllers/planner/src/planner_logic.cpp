@@ -58,7 +58,7 @@ void Planner::_nav_mode_nav(void) {
 
         // 5. Control Gains
         // cmd.x = Pitch (Forward/Back). cmd.w = Yaw Rate.
-        if (dist > 1.2) {
+        if (dist > 1.4) {
             cmd.x = 0.04 * local_x;         // Move forward based on local X error
             cmd.w = 0.95 * target_yaw_diff; // Turn based on angular error
 
@@ -81,8 +81,8 @@ void Planner::_nav_mode_nav(void) {
                     side_parallel_yaw += 2.0 * M_PI;
 
                 // Average in the current heading
-                // side_parallel_yaw =
-                //     side_parallel_yaw * 0.8 + quat_to_rot(_imu.orientation)[2] * 0.2;
+                side_parallel_yaw =
+                    side_parallel_yaw * 0.95 + quat_to_rot(_imu.orientation)[2] * 0.05;
 
                 // 4. Update the Lock Orientation
                 tf2::Quaternion q;
@@ -195,8 +195,8 @@ void Planner::_nav_mode_scan(void) {
     NavTree::nav_node_t* best_node = nullptr;
     double highest_score = -1.0;
 
-    const double RRT_STEP_SIZE = 1.2;
-    const double ROBOT_RADIUS = 1.5;
+    const double RRT_STEP_SIZE = 1.25;
+    const double ROBOT_RADIUS = 2.5;
 
     for (size_t i = 0; i + 1 < _open_markers.points.size(); i += 2) {
         const auto& p1 = _open_markers.points[i];
@@ -224,7 +224,7 @@ void Planner::_nav_mode_scan(void) {
                 step_local_x += 0.2;
             }
 
-            step_local_x += 0.45;
+            step_local_x += 0.8;
 
             // 2. TARGET HEADING (The Fix)
             // Instead of facing the target point, face the ACTUAL gap center.
