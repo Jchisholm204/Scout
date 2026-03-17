@@ -58,7 +58,7 @@ void Planner::_nav_mode_nav(void) {
 
         // 5. Control Gains
         // cmd.x = Pitch (Forward/Back). cmd.w = Yaw Rate.
-        if (dist > 1.1) {
+        if (dist > 0.9) {
             cmd.x = 0.04 * local_x;         // Move forward based on local X error
             cmd.w = 0.95 * target_yaw_diff; // Turn based on angular error
 
@@ -79,6 +79,10 @@ void Planner::_nav_mode_nav(void) {
                     side_parallel_yaw -= 2.0 * M_PI;
                 while (side_parallel_yaw < -M_PI)
                     side_parallel_yaw += 2.0 * M_PI;
+
+                // Average in the current heading
+                side_parallel_yaw =
+                    side_parallel_yaw * 0.8 + quat_to_rot(_imu.orientation)[2] * 0.2;
 
                 // 4. Update the Lock Orientation
                 tf2::Quaternion q;
@@ -157,7 +161,7 @@ void Planner::_nav_mode_wait_for_scan(void) {
     cmd.z = (local_y * Kp) - (local_vy * Kd);
 
     // 6. Safety Clamps
-    cmd.x = std::clamp(cmd.x, -0.2, 0.2);
+    cmd.x = std::clamp(cmd.x, -0.2, 0.2) + 0.05;
     cmd.z = std::clamp(cmd.z, -0.2, 0.2);
     cmd.w = std::clamp(cmd.w, -0.6, 0.6);
 
@@ -178,11 +182,8 @@ void Planner::_nav_mode_wait_for_scan(void) {
 }
 
 void Planner::_nav_mode_scan(void) {
-    RCLCPP_INFO(this->get_logger(), "SCANNING: Generating Weighted Hallway Step...");
-
     if (_open_markers.points.empty()) {
         _nav_mode = eNavMode::eBacktracking;
-        _nav_time = this->now();
         return;
     }
 
@@ -190,67 +191,92 @@ void Planner::_nav_mode_scan(void) {
     double cos_y = std::cos(rpy[2]);
     double sin_y = std::sin(rpy[2]);
 
-    double sum_weighted_x = 0;
-    double sum_weighted_y = 0;
-    double total_weight = 0;
+    NavTree::nav_node_t* best_node = nullptr;
+    double highest_score = -1.0;
 
-    const double RRT_STEP_SIZE = 1.2;
+    const double RRT_STEP_SIZE = 0.8;
+    const double INFLATION_BUFFER = 2.5; // Robot radius + safety margin
 
-    // 1. EVALUATE ALL GAPS AS A CLUSTER
     for (size_t i = 0; i + 1 < _open_markers.points.size(); i += 2) {
-        const auto& p1 = _open_markers.points[i];
-        const auto& p2 = _open_markers.points[i + 1];
+        // These points are the edges of two different wall segments
+        const auto& p1 = _open_markers.points[i];     // End of wall A
+        const auto& p2 = _open_markers.points[i + 1]; // Start of wall B
 
-        // Find the midpoint
+        // 1. TRUE GAP CALCULATION
         double mid_x = (p1.x + p2.x) / 2.0;
         double mid_y = (p1.y + p2.y) / 2.0;
+        double gap_width = std::hypot(p1.x - p2.x, p1.y - p2.y);
 
-        // Filter: Ignore points behind the sensor or too close
-        if (mid_x < 0.5)
+        // Reject if the physical opening is too small for the drone
+        if (gap_width < (INFLATION_BUFFER * 2.0))
+            continue;
+        if (mid_x < 0.3)
             continue;
 
-        // 2. CALCULATE WEIGHT
-        // Points directly in front (low mid_y) get more weight.
-        // This "pulls" the average away from the side walls.
-        double weight = 1.0 / (1.0 + std::abs(mid_y));
+        // 2. VECTOR BIASING (Moving between walls)
+        // We want to find the direction that is most "open"
+        double dist_to_p1 = std::hypot(p1.x, p1.y);
+        double dist_to_p2 = std::hypot(p2.x, p2.y);
 
-        sum_weighted_x += mid_x * weight;
-        sum_weighted_y += mid_y * weight;
-        total_weight += weight;
+        // Identify the "Critical Corner" (the one we are closest to)
+        // We need to push AWAY from this point specifically.
+        double push_x = 0, push_y = 0;
+        if (dist_to_p1 < dist_to_p2) {
+            push_x = mid_x - p1.x;
+            push_y = mid_y - p1.y;
+        } else {
+            push_x = mid_x - p2.x;
+            push_y = mid_y - p2.y;
+        }
+
+        double push_mag = std::hypot(push_x, push_y);
+        double target_x = mid_x + (push_x / push_mag) * INFLATION_BUFFER;
+        double target_y = mid_y + (push_y / push_mag) * INFLATION_BUFFER;
+
+        // 3. SMOOTH CURVE / STRAIGHT-LINE BIAS
+        // We calculate the angle of this potential move relative to our current forward
+        double dist_to_target = std::hypot(target_x, target_y);
+        double angle_to_target = std::atan2(target_y, target_x);
+
+        // Straight line bias: Prefer targets that don't require sharp turns
+        // This prevents the "jitter" and creates sweeping arcs.
+        double alignment_factor = std::cos(angle_to_target);
+
+        // Combined Score: Depth of gap * how much we have to turn
+        // alignment_factor is 1.0 at 0 deg, 0.0 at 90 deg.
+        double score = dist_to_target * std::max(0.1, alignment_factor);
+
+        if (score > highest_score) {
+            // 4. STEP PROJECTION
+            double scale = std::min(RRT_STEP_SIZE, dist_to_target) / dist_to_target;
+            double step_local_x = target_x * scale;
+            double step_local_y = target_y * scale;
+
+            // Final adjustment: if we are turning, pull the target
+            // even further forward to prevent "clipping"
+            if (std::abs(angle_to_target) > 0.2) {
+                step_local_x += 0.2;
+            }
+
+            geometry_msgs::msg::Point global_pt;
+            global_pt.x = (step_local_x * cos_y - step_local_y * sin_y) + _position.x;
+            global_pt.y = (step_local_x * sin_y + step_local_y * cos_y) + _position.y;
+            global_pt.z = 0.0;
+
+            NavTree::nav_node_t* pNode = _navtree.add_node(global_pt, _nav_target);
+            if (pNode) {
+                highest_score = score;
+                best_node = pNode;
+            }
+        }
     }
 
-    if (total_weight > 0) {
-        // 3. THE "TRUE PATH" VECTOR
-        double avg_local_x = sum_weighted_x / total_weight;
-        double avg_local_y = sum_weighted_y / total_weight;
-        double dist_to_centroid = std::hypot(avg_local_x, avg_local_y);
-
-        // 4. RRT PROJECTED STEP (Normalize to fixed size)
-        double step_local_x = (avg_local_x / dist_to_centroid) * RRT_STEP_SIZE;
-        double step_local_y = (avg_local_y / dist_to_centroid) * RRT_STEP_SIZE;
-
-        // 5. GLOBAL TRANSFORMATION
-        geometry_msgs::msg::Point global_pt;
-        global_pt.x = (step_local_x * cos_y - step_local_y * sin_y) + _position.x;
-        global_pt.y = (step_local_x * sin_y + step_local_y * cos_y) + _position.y;
-        global_pt.z = 0.0;
-
-        // 6. UPDATE TREE
-        NavTree::nav_node_t* pNode = _navtree.add_node(global_pt, _nav_target);
-
-        if (pNode) {
-            _nav_target = pNode;
-            _nav_mode = eNavMode::eNavigating;
-            RCLCPP_INFO(this->get_logger(), "Step projected: X:%.2f Y:%.2f", step_local_x,
-                        step_local_y);
-        } else {
-            // Point already visited or too close to existing path
-            _nav_mode = eNavMode::eBacktracking;
-        }
+    if (best_node) {
+        _nav_target = best_node;
+        _nav_mode = eNavMode::eNavigating;
     } else {
         _nav_mode = eNavMode::eBacktracking;
     }
-
     _nav_time = this->now();
 }
 
