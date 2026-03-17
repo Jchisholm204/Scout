@@ -70,6 +70,8 @@ Planner::Planner() : Node("path_planner"), _navtree{2.0} {
     // Setup operational timer
     _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(50),
                                           std::bind(&Planner::ctrl_callback, this));
+
+    _nav_mode = eNavMode::eInit;
 }
 
 Planner::~Planner() {
@@ -101,32 +103,4 @@ void Planner::_pos_callback(const geometry_msgs::msg::Point& position) {
 
 void Planner::_vel_callback(const geometry_msgs::msg::Vector3& velocity) {
     this->_velocity = velocity;
-}
-
-void Planner::ctrl_callback(void) {
-    if (!_navtree.get_n()) {
-        // Add node to start moving forwards into tunnel
-        geometry_msgs::msg::Point p;
-        p.x = 1 + _position.x;
-        p.y = 0 + _position.y;
-        p.z = 0;
-        _navtree.add_node(p, NULL);
-    }
-    geometry_msgs::msg::Point cp = _position;
-    auto rot = quat_to_rot(_imu.orientation);
-    _navtree_pub->publish(_navtree.get_all(cp, rot[2], _open_markers.header.frame_id));
-
-    geometry_msgs::msg::Quaternion cmd;
-    cmd.y = 0.00;
-
-    if (_open_markers.points.size() >= 1) {
-        cmd.x = 0.01 * _open_markers.points[0].y;
-        cmd.w = -0.05 * _open_markers.points[0].x;
-    } else {
-        cmd.x = 0;
-        cmd.w = 0;
-    }
-    RCLCPP_INFO(this->get_logger(), "Ctrl: %.3f %.3f %.3f %.3f", cmd.x, cmd.y, cmd.z,
-                cmd.w);
-    _movement_pub->publish(cmd);
 }

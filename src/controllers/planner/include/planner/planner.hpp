@@ -62,6 +62,11 @@ class Planner : public rclcpp::Node {
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
     void ctrl_callback(void);
 
+    void _nav_mode_init(void);
+    void _nav_mode_nav(void);
+    void _nav_mode_scan(void);
+    void _nav_mode_backtrack(void);
+
     sensor_msgs::msg::Imu _imu;
     sensor_msgs::msg::BatteryState _battery;
     enum class eCBMode {
@@ -73,10 +78,13 @@ class Planner : public rclcpp::Node {
         eModeStalled,
         eModeFault
     } _mode;
+    enum class eNavMode { eInit, eNavigating, eScanning, eBacktracking } _nav_mode;
     visualization_msgs::msg::Marker _wall_markers;
     visualization_msgs::msg::Marker _open_markers;
     geometry_msgs::msg::Point _position;
+    geometry_msgs::msg::Quaternion _lock_orientation;
     geometry_msgs::msg::Vector3 _velocity;
+    NavTree::nav_node_t* _nav_target = NULL;
     NavTree _navtree;
 };
 
