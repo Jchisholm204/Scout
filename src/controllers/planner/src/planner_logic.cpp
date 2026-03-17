@@ -107,31 +107,39 @@ void Planner::_nav_mode_scan(void) {
     double cos_y = std::cos(current_yaw);
     double sin_y = std::sin(current_yaw);
 
-    // Transform global displacement into the drone's current local frame
     double local_x = dx * cos_y + dy * sin_y;
     double local_y = -dx * sin_y + dy * cos_y;
 
-    // 4. Controller Application
-    geometry_msgs::msg::Quaternion cmd;
-    cmd.y = 0.0; // Altitude hold
+    // 4. Velocity "Friction" (The D-term)
+    // Transform global velocity into the drone's local frame
+    double local_vx = _velocity.x * cos_y + _velocity.y * sin_y;
+    double local_vy = -_velocity.x * sin_y + _velocity.y * cos_y;
 
-    // Apply your specific gains
+    // 5. Controller Application
+    geometry_msgs::msg::Quaternion cmd;
+    cmd.y = 0.0;
+
+    // Gains
+    const double Kp = 0.05; // Your current P gain
+    const double Kd = 0.03; // D gain (start around 0.03 - 0.05)
+
     // cmd.w (Yaw) targets the lock orientation
     cmd.w = -0.95 * yaw_error;
 
-    // cmd.x (Pitch) and cmd.z (Roll) hold the XY position
-    cmd.x = 0.05 * local_x;
-    cmd.z = 0.05 * local_y;
+    // XY Hold with D-term: (Error * P) - (Velocity * D)
+    cmd.x = (local_x * Kp) - (local_vx * Kd);
+    cmd.z = (local_y * Kp) - (local_vy * Kd);
 
-    // 5. Safety Clamps
+    // 6. Safety Clamps
     cmd.x = std::clamp(cmd.x, -0.2, 0.2);
     cmd.z = std::clamp(cmd.z, -0.2, 0.2);
     cmd.w = std::clamp(cmd.w, -0.6, 0.6);
 
     _movement_pub->publish(cmd);
 
-    RCLCPP_INFO(this->get_logger(), "SCAN LOCK: YawErr: %.3f | LocalErr: X:%.2f Y:%.2f",
-                yaw_error, local_x, local_y);
+    RCLCPP_INFO(this->get_logger(),
+                "SCAN LOCK: YawErr: %.3f | LocalErr: X:%.2f Y:%.2f | LocalV: X:%.2f",
+                yaw_error, local_x, local_y, local_vx);
 }
 
 void Planner::_nav_mode_backtrack(void) {
