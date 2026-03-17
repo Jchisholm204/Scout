@@ -64,19 +64,19 @@ void Localization::_hldr_callback(const sensor_msgs::msg::LaserScan& ldr) {
     open.color.a = 1.0;
     geometry_msgs::msg::Point last = walls.points[0];
     for (size_t i = 0; i + 3 < walls.points.size(); i += 2) {
-    const auto& p_end_current = walls.points[i+1];
-    const auto& p_start_next = walls.points[i+2];
+        const auto& p_end_current = walls.points[i + 1];
+        const auto& p_start_next = walls.points[i + 2];
 
-    // Calculate distance between segments
-    float dx = p_start_next.x - p_end_current.x;
-    float dy = p_start_next.y - p_end_current.y;
-    float gap_dist = sqrt(dx*dx + dy*dy);
+        // Calculate distance between segments
+        float dx = p_start_next.x - p_end_current.x;
+        float dy = p_start_next.y - p_end_current.y;
+        float gap_dist = sqrt(dx * dx + dy * dy);
 
-    if (gap_dist > _line_gap_thresh) {
-        open.points.push_back(p_end_current);
-        open.points.push_back(p_start_next);
+        if (gap_dist > _line_gap_thresh) {
+            open.points.push_back(p_end_current);
+            open.points.push_back(p_start_next);
+        }
     }
-}
     this->_open_marker_pub->publish(open);
 }
 
@@ -101,8 +101,9 @@ visualization_msgs::msg::Marker Localization::_process_ldr(
         float range = ldr.ranges[i];
 
         // 1. VALIDATION CHECK
-        if (!std::isfinite(range) || range < ldr.range_min || range > ldr.range_max) {
-            // We do NOT reset segment_started yet. 
+        if (!std::isfinite(range) || range < (ldr.range_min + 0.5) ||
+            range > (ldr.range_max - 1.5)) {
+            // We do NOT reset segment_started yet.
             // We just skip this index and try to connect the next valid one.
             continue;
         }
@@ -140,8 +141,8 @@ visualization_msgs::msg::Marker Localization::_process_ldr(
         float range_2 = range * range;
 
         // Law of Cosines using the actual angle difference
-        float line_gap = sqrt(std::max(0.0f, (range_2 + range_last_2) - 
-                                             (2 * range * range_last * cos_diff)));
+        float line_gap = sqrt(std::max(0.0f, (range_2 + range_last_2) -
+                                                 (2 * range * range_last * cos_diff)));
 
         // 4. BREAK CONDITIONS
         if (line_gap > _line_gap_thresh) {
@@ -187,4 +188,3 @@ visualization_msgs::msg::Marker Localization::_process_ldr(
 
     return walls;
 }
-
