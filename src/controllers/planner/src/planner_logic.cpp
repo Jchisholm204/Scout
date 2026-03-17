@@ -65,7 +65,31 @@ void Planner::_nav_mode_nav(void) {
             // Optional: Limit speeds so it doesn't flip
             cmd.x = std::clamp(cmd.x, -0.15, 0.15);
             cmd.w = std::clamp(cmd.w, -0.6, 0.6);
-            _lock_orientation = _imu.orientation;
+            NavTree::nav_node_t* pLast = _navtree.get_parent(_nav_target);
+            if (pLast) {
+                // Calculate the angle from the parent to the new target
+                double dx = _nav_target->x - pLast->x;
+                double dy = _nav_target->y - pLast->y;
+                double path_angle = std::atan2(dy, dx);
+
+                double side_parallel_yaw = path_angle + (M_PI / 2.0);
+
+                // 3. Normalize to [-PI, PI]
+                while (side_parallel_yaw > M_PI)
+                    side_parallel_yaw -= 2.0 * M_PI;
+                while (side_parallel_yaw < -M_PI)
+                    side_parallel_yaw += 2.0 * M_PI;
+
+                // 4. Update the Lock Orientation
+                tf2::Quaternion q;
+                q.setRPY(0, 0, side_parallel_yaw);
+                _lock_orientation.x = q.x();
+                _lock_orientation.y = q.y();
+                _lock_orientation.z = q.z();
+                _lock_orientation.w = q.w();
+            } else {
+                _lock_orientation = _imu.orientation;
+            }
         } else {
             // Arrival Logic: Mark as visited and find next
             _navtree.set_visited(_nav_target, true);
@@ -154,7 +178,7 @@ void Planner::_nav_mode_wait_for_scan(void) {
 }
 
 void Planner::_nav_mode_scan(void) {
-    RCLCPP_INFO(this->get_logger(), "SCANNING: Projecting RRT Step...");
+    RCLCPP_INFO(this->get_logger(), "SCANNING: Generating Weighted Hallway Step...");
 
     if (_open_markers.points.empty()) {
         _nav_mode = eNavMode::eBacktracking;
@@ -166,57 +190,65 @@ void Planner::_nav_mode_scan(void) {
     double cos_y = std::cos(rpy[2]);
     double sin_y = std::sin(rpy[2]);
 
-    NavTree::nav_node_t* best_new_node = nullptr;
-    double min_angle_to_center = 180.0; // To pick the gap most "in front" of us
+    double sum_weighted_x = 0;
+    double sum_weighted_y = 0;
+    double total_weight = 0;
+
     const double RRT_STEP_SIZE = 1.2;
 
+    // 1. EVALUATE ALL GAPS AS A CLUSTER
     for (size_t i = 0; i + 1 < _open_markers.points.size(); i += 2) {
         const auto& p1 = _open_markers.points[i];
         const auto& p2 = _open_markers.points[i + 1];
 
-        // 1. Find the local midpoint of the gap
+        // Find the midpoint
         double mid_x = (p1.x + p2.x) / 2.0;
         double mid_y = (p1.y + p2.y) / 2.0;
 
-        // 2. Filter: Ignore if behind us
-        if (mid_x < 0.0)
+        // Filter: Ignore points behind the sensor or too close
+        if (mid_x < 0.5)
             continue;
 
-        // 3. RRT PROJECTED STEP
-        // Calculate the unit vector toward the gap midpoint
-        double dist_to_gap = std::hypot(mid_x, mid_y);
-        if (dist_to_gap < 0.5)
-            continue; // Skip gaps we are already inside
+        // 2. CALCULATE WEIGHT
+        // Points directly in front (low mid_y) get more weight.
+        // This "pulls" the average away from the side walls.
+        double weight = 1.0 / (1.0 + std::abs(mid_y));
 
-        // Project a point exactly 2m away in that direction
-        double step_local_x = (mid_x / dist_to_gap) * RRT_STEP_SIZE;
-        double step_local_y = (mid_y / dist_to_gap) * RRT_STEP_SIZE;
+        sum_weighted_x += mid_x * weight;
+        sum_weighted_y += mid_y * weight;
+        total_weight += weight;
+    }
 
-        // 4. Global Transformation
+    if (total_weight > 0) {
+        // 3. THE "TRUE PATH" VECTOR
+        double avg_local_x = sum_weighted_x / total_weight;
+        double avg_local_y = sum_weighted_y / total_weight;
+        double dist_to_centroid = std::hypot(avg_local_x, avg_local_y);
+
+        // 4. RRT PROJECTED STEP (Normalize to fixed size)
+        double step_local_x = (avg_local_x / dist_to_centroid) * RRT_STEP_SIZE;
+        double step_local_y = (avg_local_y / dist_to_centroid) * RRT_STEP_SIZE;
+
+        // 5. GLOBAL TRANSFORMATION
         geometry_msgs::msg::Point global_pt;
         global_pt.x = (step_local_x * cos_y - step_local_y * sin_y) + _position.x;
         global_pt.y = (step_local_x * sin_y + step_local_y * cos_y) + _position.y;
         global_pt.z = 0.0;
 
-        // 5. Add to Tree
-        // We pick the "best" node based on which one is most aligned with our nose
-        double angle_err = std::abs(std::atan2(step_local_y, step_local_x));
-
+        // 6. UPDATE TREE
         NavTree::nav_node_t* pNode = _navtree.add_node(global_pt, _nav_target);
-        if (pNode && angle_err < min_angle_to_center) {
-            min_angle_to_center = angle_err;
-            best_new_node = pNode;
-        }
-    }
 
-    // 6. Transition
-    if (best_new_node) {
-        _nav_target = best_new_node;
-        _nav_mode = eNavMode::eNavigating;
-        RCLCPP_INFO(this->get_logger(), "Stepping 2m toward frontier.");
+        if (pNode) {
+            _nav_target = pNode;
+            _nav_mode = eNavMode::eNavigating;
+            RCLCPP_INFO(this->get_logger(), "Step projected: X:%.2f Y:%.2f", step_local_x,
+                        step_local_y);
+        } else {
+            // Point already visited or too close to existing path
+            _nav_mode = eNavMode::eBacktracking;
+        }
     } else {
         _nav_mode = eNavMode::eBacktracking;
-        RCLCPP_INFO(this->get_logger(), "Path blocked or duplicate. Backtracking.");
     }
 
     _nav_time = this->now();

@@ -41,7 +41,7 @@ class NavTree {
     bool remove_node(nav_node_t* pNode);
 
     nav_node_t* get_nearest(geometry_msgs::msg::Point);
-    nav_node_t* get_paernt(nav_node_t* pNode) { return pNode->parent; }
+    nav_node_t* get_parent(nav_node_t* pNode) { return pNode->parent; }
 
     // Returns how many nodes are in the tree
     std::size_t get_n(void) { return _all_nodes.size(); }

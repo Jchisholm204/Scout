@@ -16,7 +16,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <unistd.h>
 
-Planner::Planner() : Node("path_planner"), _navtree{0.5} {
+Planner::Planner() : Node("path_planner"), _navtree{0.25} {
     this->declare_parameter("imu_topic", "sim/imu");
     this->declare_parameter("battery_topic", "sim/batt");
     this->declare_parameter("mode_topic", "cb/mode");
