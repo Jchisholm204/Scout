@@ -10,13 +10,12 @@
  */
 
 #include "planner/planner.hpp"
-
-#include "planner/navtree.hpp"
+#include "planner/quatrot.hpp"
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <unistd.h>
 
-Planner::Planner() : Node("path_planner") {
+Planner::Planner() : Node("path_planner"), _navtree{2.0} {
     this->declare_parameter("imu_topic", "sim/imu");
     this->declare_parameter("battery_topic", "sim/batt");
     this->declare_parameter("mode_topic", "cb/mode");
@@ -25,6 +24,7 @@ Planner::Planner() : Node("path_planner") {
     this->declare_parameter("position_topic", "sim/position");
     this->declare_parameter("velocity_topic", "sim/velocity");
     this->declare_parameter("movement_topic", "cb/vel_cmd");
+    this->declare_parameter("navtree_topic", "/navtree");
 
     std::string imu_topic = this->get_parameter("imu_topic").as_string();
     std::string battery_topic = this->get_parameter("battery_topic").as_string();
@@ -34,6 +34,7 @@ Planner::Planner() : Node("path_planner") {
     std::string position_topic = this->get_parameter("position_topic").as_string();
     std::string velocity_topic = this->get_parameter("velocity_topic").as_string();
     std::string movement_topic = this->get_parameter("movement_topic").as_string();
+    std::string navtree_topic = this->get_parameter("navtree_topic").as_string();
 
     // Create Subscriptions to drone topics
     _imu_sub = this->create_subscription<sensor_msgs::msg::Imu>(
@@ -62,10 +63,18 @@ Planner::Planner() : Node("path_planner") {
     // Create Publishers
     _movement_pub =
         this->create_publisher<geometry_msgs::msg::Quaternion>(movement_topic, 10);
+    _navtree_pub =
+        this->create_publisher<visualization_msgs::msg::MarkerArray>(navtree_topic, 10);
 
     // Setup operational timer
     _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(50),
                                           std::bind(&Planner::ctrl_callback, this));
+    // Add node to start moving forwards into tunnel
+    geometry_msgs::msg::Point p;
+    p.x = 1;
+    p.y = 0;
+    p.z = 0;
+    _navtree.add_node(p, NULL);
 }
 
 Planner::~Planner() {
@@ -99,22 +108,15 @@ void Planner::_vel_callback(const geometry_msgs::msg::Vector3& velocity) {
     this->_velocity = velocity;
 }
 
+
 void Planner::ctrl_callback(void) {
-    static int f_cmd = 0;
+    geometry_msgs::msg::Point cp = _position;
+    auto rot = quat_to_rot(_imu.orientation);
+    _navtree_pub->publish(_navtree.get_all(cp, rot[2], _open_markers.header.frame_id));
+
     geometry_msgs::msg::Quaternion cmd;
-    // if (f_cmd == 0) {
-    //     f_cmd = 1;
-    //     cmd.x = 0.0;
-    // } else if (f_cmd == 1) {
-    //     f_cmd = -1;
-    //     cmd.x = 0.06;
-    // } else if (f_cmd == -1) {
-    //     f_cmd = 0;
-    //     cmd.x = -0.05;
-    // }
     cmd.y = 0.00;
-    // cmd.z = 0.00;
-    // cmd.w = 0.00;
+
     if (_open_markers.points.size() >= 1) {
         cmd.x = 0.01 * _open_markers.points[0].y;
         cmd.w = -0.05 * _open_markers.points[0].x;

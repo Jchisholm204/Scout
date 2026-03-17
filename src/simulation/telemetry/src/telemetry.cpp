@@ -23,8 +23,7 @@ Telemetry::Telemetry() : Node("sim_telemetry") {
     // Set to the Jetson SLAM refresh rate
     this->declare_parameter("pub_rate", 50);
 
-    std::string pub_base =
-        this->get_parameter("pub_base").as_string();
+    std::string pub_base = this->get_parameter("pub_base").as_string();
     int64_t pub_rate = this->get_parameter("pub_rate").as_int();
 
     // Sanitize Parameters
@@ -54,14 +53,12 @@ Telemetry::Telemetry() : Node("sim_telemetry") {
 
     _batt_pub =
         this->create_publisher<sensor_msgs::msg::BatteryState>(pub_base + "/batt", 10);
-    _imu_pub =
-        this->create_publisher<sensor_msgs::msg::Imu>(pub_base + "/imu", 10);
+    _imu_pub = this->create_publisher<sensor_msgs::msg::Imu>(pub_base + "/imu", 10);
     _pos_pub =
         this->create_publisher<geometry_msgs::msg::Point>(pub_base + "/position", 10);
     _vel_pub =
         this->create_publisher<geometry_msgs::msg::Vector3>(pub_base + "/velocity", 10);
-    _time_pub =
-        this->create_publisher<std_msgs::msg::Float32>(pub_base + "/time", 10);
+    _time_pub = this->create_publisher<std_msgs::msg::Float32>(pub_base + "/time", 10);
 
     _callback_timer = this->create_wall_timer(std::chrono::milliseconds(pub_rate),
                                               std::bind(&Telemetry::_callback, this));
@@ -74,10 +71,10 @@ void Telemetry::_callback(void) {
     lf_telemetry_packet_t telem_pkt;
     ssize_t n = recvfrom(_udp_fp, &telem_pkt, sizeof(lf_telemetry_packet_t), MSG_DONTWAIT,
                          NULL, NULL);
-    if(n != sizeof(lf_telemetry_packet_t)){
+    if (n != sizeof(lf_telemetry_packet_t)) {
         return;
     }
-    
+
     sensor_msgs::msg::BatteryState batt_msg;
     batt_msg.percentage = telem_pkt.batPct;
     batt_msg.voltage = telem_pkt.batVolt;
@@ -89,7 +86,7 @@ void Telemetry::_callback(void) {
     imu_msg.orientation.x = telem_pkt.rotX;
     imu_msg.orientation.y = telem_pkt.rotZ;
     imu_msg.orientation.z = telem_pkt.rotY;
-    imu_msg.orientation.w = telem_pkt.rotW;
+    imu_msg.orientation.w = -telem_pkt.rotW;
     _imu_pub->publish(imu_msg);
 
     geometry_msgs::msg::Point pos_msg;

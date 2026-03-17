@@ -86,21 +86,11 @@ def generate_launch_description():
             executable='driver',
             name='cb_interface',
         ),
+
         # Launch the LiDAR Segmentation Node
-        # Node(
-        #     package='laser_segmentation',
-        #     executable='laser_segmentation',
-        #     name='lidar_segmentation',
-        #     parameters=[{
-        #         'target_frame': 'lidar_front_frame',
-        #         'segmentation_type': 'jump_distance_merge',  # Common algorithm
-        #         'min_points': 5,
-        #         'max_distance_jump': 0.1,
-        #     }],
-        #     remappings=[
-        #         # Map 'scan' to your specific lidar topic name if it's different
-        #         ('/scan', '/cb/ls_front'),
-        #     ],
-        #     output='screen'
-        # ),
+        Node(
+            package='controllers',
+            executable='localization',
+            name='localizer',
+        ),
     ])

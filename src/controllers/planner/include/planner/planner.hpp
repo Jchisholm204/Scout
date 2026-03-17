@@ -12,6 +12,8 @@
 #ifndef _PLANNER_HPP_
 #define _PLANNER_HPP_
 
+#include "planner/navtree.hpp"
+
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <geometry_msgs/msg/vector3.h>
@@ -54,6 +56,7 @@ class Planner : public rclcpp::Node {
 
     // ROS Message Publishers
     rclcpp::Publisher<geometry_msgs::msg::Quaternion>::SharedPtr _movement_pub;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr _navtree_pub;
 
     // Runtime
     rclcpp::TimerBase::SharedPtr _ctrl_timer;
@@ -74,6 +77,7 @@ class Planner : public rclcpp::Node {
     visualization_msgs::msg::Marker _open_markers;
     geometry_msgs::msg::Point _position;
     geometry_msgs::msg::Vector3 _velocity;
+    NavTree _navtree;
 };
 
 #endif
