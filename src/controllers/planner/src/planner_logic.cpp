@@ -58,7 +58,7 @@ void Planner::_nav_mode_nav(void) {
 
         // 5. Control Gains
         // cmd.x = Pitch (Forward/Back). cmd.w = Yaw Rate.
-        if (dist > 0.9) {
+        if (dist > 1.2) {
             cmd.x = 0.04 * local_x;         // Move forward based on local X error
             cmd.w = 0.95 * target_yaw_diff; // Turn based on angular error
 
@@ -81,8 +81,8 @@ void Planner::_nav_mode_nav(void) {
                     side_parallel_yaw += 2.0 * M_PI;
 
                 // Average in the current heading
-                side_parallel_yaw =
-                    side_parallel_yaw * 0.8 + quat_to_rot(_imu.orientation)[2] * 0.2;
+                // side_parallel_yaw =
+                //     side_parallel_yaw * 0.8 + quat_to_rot(_imu.orientation)[2] * 0.2;
 
                 // 4. Update the Lock Orientation
                 tf2::Quaternion q;
@@ -161,7 +161,7 @@ void Planner::_nav_mode_wait_for_scan(void) {
     cmd.z = (local_y * Kp) - (local_vy * Kd);
 
     // 6. Safety Clamps
-    cmd.x = std::clamp(cmd.x, -0.2, 0.2) + 0.05;
+    cmd.x = std::clamp(cmd.x, -0.2, 0.2) + 0.01;
     cmd.z = std::clamp(cmd.z, -0.2, 0.2);
     cmd.w = std::clamp(cmd.w, -0.6, 0.6);
 
@@ -188,83 +188,59 @@ void Planner::_nav_mode_scan(void) {
     }
 
     auto rpy = quat_to_rot(_imu.orientation);
-    double cos_y = std::cos(rpy[2]);
-    double sin_y = std::sin(rpy[2]);
+    double current_yaw = rpy[2];
+    double cos_y = std::cos(current_yaw);
+    double sin_y = std::sin(current_yaw);
 
     NavTree::nav_node_t* best_node = nullptr;
     double highest_score = -1.0;
 
-    const double RRT_STEP_SIZE = 0.8;
-    const double INFLATION_BUFFER = 2.5; // Robot radius + safety margin
+    const double RRT_STEP_SIZE = 1.2;
+    const double ROBOT_RADIUS = 1.5;
 
     for (size_t i = 0; i + 1 < _open_markers.points.size(); i += 2) {
-        // These points are the edges of two different wall segments
-        const auto& p1 = _open_markers.points[i];     // End of wall A
-        const auto& p2 = _open_markers.points[i + 1]; // Start of wall B
+        const auto& p1 = _open_markers.points[i];
+        const auto& p2 = _open_markers.points[i + 1];
 
-        // 1. TRUE GAP CALCULATION
+        double gap_width = std::hypot(p1.x - p2.x, p1.y - p2.y);
+        if (gap_width < (ROBOT_RADIUS * 2.0))
+            continue;
+
         double mid_x = (p1.x + p2.x) / 2.0;
         double mid_y = (p1.y + p2.y) / 2.0;
-        double gap_width = std::hypot(p1.x - p2.x, p1.y - p2.y);
+        double dist_to_gap = std::hypot(mid_x, mid_y);
 
-        // Reject if the physical opening is too small for the drone
-        if (gap_width < (INFLATION_BUFFER * 2.0))
-            continue;
-        if (mid_x < 0.3)
-            continue;
-
-        // 2. VECTOR BIASING (Moving between walls)
-        // We want to find the direction that is most "open"
-        double dist_to_p1 = std::hypot(p1.x, p1.y);
-        double dist_to_p2 = std::hypot(p2.x, p2.y);
-
-        // Identify the "Critical Corner" (the one we are closest to)
-        // We need to push AWAY from this point specifically.
-        double push_x = 0, push_y = 0;
-        if (dist_to_p1 < dist_to_p2) {
-            push_x = mid_x - p1.x;
-            push_y = mid_y - p1.y;
-        } else {
-            push_x = mid_x - p2.x;
-            push_y = mid_y - p2.y;
-        }
-
-        double push_mag = std::hypot(push_x, push_y);
-        double target_x = mid_x + (push_x / push_mag) * INFLATION_BUFFER;
-        double target_y = mid_y + (push_y / push_mag) * INFLATION_BUFFER;
-
-        // 3. SMOOTH CURVE / STRAIGHT-LINE BIAS
-        // We calculate the angle of this potential move relative to our current forward
-        double dist_to_target = std::hypot(target_x, target_y);
-        double angle_to_target = std::atan2(target_y, target_x);
-
-        // Straight line bias: Prefer targets that don't require sharp turns
-        // This prevents the "jitter" and creates sweeping arcs.
-        double alignment_factor = std::cos(angle_to_target);
-
-        // Combined Score: Depth of gap * how much we have to turn
-        // alignment_factor is 1.0 at 0 deg, 0.0 at 90 deg.
-        double score = dist_to_target * std::max(0.1, alignment_factor);
+        // Bias: We want deep gaps that are somewhat in front of us
+        double angle_to_gap = std::atan2(mid_y, mid_x);
+        double score = dist_to_gap * std::cos(angle_to_gap * 0.5);
 
         if (score > highest_score) {
-            // 4. STEP PROJECTION
-            double scale = std::min(RRT_STEP_SIZE, dist_to_target) / dist_to_target;
-            double step_local_x = target_x * scale;
-            double step_local_y = target_y * scale;
+            // 1. POSITION CALCULATION
+            double step_local_x = (mid_x / dist_to_gap) * RRT_STEP_SIZE;
+            double step_local_y = (mid_y / dist_to_gap) * RRT_STEP_SIZE;
 
-            // Final adjustment: if we are turning, pull the target
-            // even further forward to prevent "clipping"
-            if (std::abs(angle_to_target) > 0.2) {
+            // Apply the "Swing Wide" to the position
+            if (std::abs(mid_y) > 0.3) {
                 step_local_x += 0.2;
             }
+
+            step_local_x += 0.45;
+
+            // 2. TARGET HEADING (The Fix)
+            // Instead of facing the target point, face the ACTUAL gap center.
+            // This ensures that as we move, our sensors are rotating toward the opening.
+            double target_yaw_local = std::atan2(mid_y, mid_x);
+            double global_yaw = current_yaw + target_yaw_local;
 
             geometry_msgs::msg::Point global_pt;
             global_pt.x = (step_local_x * cos_y - step_local_y * sin_y) + _position.x;
             global_pt.y = (step_local_x * sin_y + step_local_y * cos_y) + _position.y;
             global_pt.z = 0.0;
 
+            // Assuming your NavTree node can store a desired yaw
             NavTree::nav_node_t* pNode = _navtree.add_node(global_pt, _nav_target);
             if (pNode) {
+                // pNode->yaw = global_yaw; // Store this for your controller!
                 highest_score = score;
                 best_node = pNode;
             }
@@ -277,7 +253,6 @@ void Planner::_nav_mode_scan(void) {
     } else {
         _nav_mode = eNavMode::eBacktracking;
     }
-    _nav_time = this->now();
 }
 
 void Planner::_nav_mode_backtrack(void) {
