@@ -42,6 +42,9 @@ class NavTree {
 
     nav_node_t* get_nearest(geometry_msgs::msg::Point);
 
+    // Returns how many nodes are in the tree
+    std::size_t get_n(void) { return _all_nodes.size(); }
+
     // Returns a viz msg of all points offset from the local frame
     const visualization_msgs::msg::MarkerArray get_all(
         geometry_msgs::msg::Point drone_pos, double drone_yaw, std::string frame_id);

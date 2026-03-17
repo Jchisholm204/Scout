@@ -10,6 +10,7 @@
  */
 
 #include "planner/planner.hpp"
+
 #include "planner/quatrot.hpp"
 
 #include <tf2/LinearMath/Quaternion.h>
@@ -69,12 +70,6 @@ Planner::Planner() : Node("path_planner"), _navtree{2.0} {
     // Setup operational timer
     _ctrl_timer = this->create_wall_timer(std::chrono::milliseconds(50),
                                           std::bind(&Planner::ctrl_callback, this));
-    // Add node to start moving forwards into tunnel
-    geometry_msgs::msg::Point p;
-    p.x = 1;
-    p.y = 0;
-    p.z = 0;
-    _navtree.add_node(p, NULL);
 }
 
 Planner::~Planner() {
@@ -108,8 +103,15 @@ void Planner::_vel_callback(const geometry_msgs::msg::Vector3& velocity) {
     this->_velocity = velocity;
 }
 
-
 void Planner::ctrl_callback(void) {
+    if (!_navtree.get_n()) {
+        // Add node to start moving forwards into tunnel
+        geometry_msgs::msg::Point p;
+        p.x = 1 + _position.x;
+        p.y = 0 + _position.y;
+        p.z = 0;
+        _navtree.add_node(p, NULL);
+    }
     geometry_msgs::msg::Point cp = _position;
     auto rot = quat_to_rot(_imu.orientation);
     _navtree_pub->publish(_navtree.get_all(cp, rot[2], _open_markers.header.frame_id));
