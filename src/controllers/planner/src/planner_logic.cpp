@@ -58,7 +58,7 @@ void Planner::_nav_mode_nav(void) {
 
         // 5. Control Gains
         // cmd.x = Pitch (Forward/Back). cmd.w = Yaw Rate.
-        if (dist > 1.4) {
+        if (dist > 1.3) {
             cmd.x = 0.04 * local_x;         // Move forward based on local X error
             cmd.w = 0.95 * target_yaw_diff; // Turn based on angular error
 
@@ -82,7 +82,7 @@ void Planner::_nav_mode_nav(void) {
 
                 // Average in the current heading
                 side_parallel_yaw =
-                    side_parallel_yaw * 0.95 + quat_to_rot(_imu.orientation)[2] * 0.05;
+                    side_parallel_yaw * 0.90 + quat_to_rot(_imu.orientation)[2] * 0.1;
 
                 // 4. Update the Lock Orientation
                 tf2::Quaternion q;
@@ -224,7 +224,7 @@ void Planner::_nav_mode_scan(void) {
                 step_local_x += 0.2;
             }
 
-            step_local_x += 0.8;
+            step_local_x += 0.9;
 
             // 2. TARGET HEADING (The Fix)
             // Instead of facing the target point, face the ACTUAL gap center.
