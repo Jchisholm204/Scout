@@ -173,7 +173,7 @@ void Planner::_nav_mode_wait_for_scan(void) {
         "SCAN LOCK: YawErr: %.3f | LocalErr: X:%.2f Y:%.2f | LocalV: X:%.2f | %.4f",
         yaw_error, local_x, local_y, local_vx, (this->now() - _nav_time).seconds());
 
-    if ((this->now() - _nav_time).seconds() > 4.5) {
+    if ((this->now() - _nav_time).seconds() > 3.95) {
         RCLCPP_INFO(this->get_logger(), "Triggered Scan Analysis");
 
         _nav_mode = eNavMode::eScanning;
